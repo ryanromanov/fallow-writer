@@ -32,6 +32,7 @@ rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$bin" "$app/Contents/MacOS/Fallow"
 cp Resources/Info.plist "$app/Contents/Info.plist"
+swift scripts/make-icon.swift "$app/Contents/Resources/AppIcon.icns"
 if [ -n "$version" ]; then
     plutil -replace CFBundleShortVersionString -string "$version" "$app/Contents/Info.plist"
     # The build number must be numbers and dots, so drop a pre-release suffix like "-beta.1".

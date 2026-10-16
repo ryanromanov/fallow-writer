@@ -1,3 +1,5 @@
+<img src="docs/images/icon.png" width="96" height="96" alt="Fallow's icon: a field of brown soil under a pale sky with a soft sun.">
+
 # Fallow
 
 A quiet place to write. Fallow is a native macOS app for distraction-free writing: just your words in a centered column on a soft background. The window's controls fade away while you type and come back when you move the mouse.
