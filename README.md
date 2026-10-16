@@ -2,6 +2,11 @@
 
 A quiet place to write. Fallow is a native macOS app for distraction-free writing: just your words in a centered column on a soft background. The window's controls fade away while you type and come back when you move the mouse.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/writing-dark.png">
+  <img alt="Fallow's writing window: three short paragraphs in a serif typeface on a warm, paper-colored background, with the document name and word count faint at the bottom." src="docs/images/writing-light.png">
+</picture>
+
 It's named after fallow ground, a field left to rest before it's planted again.
 
 ## Features
@@ -16,6 +21,8 @@ It's named after fallow ground, a field left to rest before it's planted again.
 - A speaker button in the corner opens a small panel for choosing sounds and setting their volumes. Fallow remembers your choices
 - Sandboxed: Fallow can only open the files you choose
 
+<img alt="The sound panel open above the speaker button: ambient sound set to Low Field, keystroke sounds set to Marimba, each with a volume slider." src="docs/images/sound-panel.png">
+
 Coming later: more sounds and backgrounds, and export.
 
 ## Building
@@ -26,6 +33,7 @@ scripts/bundle.sh    # builds Fallow.app
 open Fallow.app
 scripts/test.sh      # runs the tests
 scripts/audition.sh  # renders preview WAVs of the sounds into ./audition
+scripts/screenshots.sh  # renders the README's screenshots into docs/images
 ```
 
 ## License

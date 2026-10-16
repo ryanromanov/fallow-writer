@@ -76,6 +76,14 @@ final class SoundPanel: NSViewController {
             self, selector: #selector(refresh), name: WriterSettings.didChange, object: settings)
     }
 
+    /// The system's serif (New York), for Fallow's own name and artwork.
+    static func serif(size: CGFloat, italic: Bool = false) -> NSFont {
+        let base = NSFont.systemFont(ofSize: size).fontDescriptor
+        var descriptor = base.withDesign(.serif) ?? base
+        if italic { descriptor = descriptor.withSymbolicTraits(.italic) }
+        return NSFont(descriptor: descriptor, size: size) ?? .systemFont(ofSize: size)
+    }
+
     /// A small letter-spaced heading over a row of choices and its volume slider.
     private func section(_ title: String, _ choices: ChoiceRow, _ volume: NSView) -> NSView {
         let heading = NSTextField(labelWithString: "")
