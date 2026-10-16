@@ -132,6 +132,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
         // Because documents autosave, AppKit turns this into a Revert To submenu (Last Opened,
         // Last Saved, Browse All Versions…), as in TextEdit.
         menu.addItem(item("Revert to Saved", #selector(NSDocument.revertToSaved(_:))))
+        menu.addItem(.separator())
+        // AppKit adds its Share submenu, with a separator, right after the PDF item, so PDF goes
+        // last: the exports stay together and Share follows them.
+        menu.addItem(item("Export as Rich Text…", #selector(TextDocument.exportRichText(_:))))
+        menu.addItem(item("Export as Word Document…", #selector(TextDocument.exportWordDocument(_:))))
+        menu.addItem(item("Export as PDF…", #selector(NSDocument.saveToPDF(_:))))
+        menu.addItem(.separator())
+        menu.addItem(item("Print…", #selector(NSDocument.printDocument(_:)), "p"))
         return menu
     }
 

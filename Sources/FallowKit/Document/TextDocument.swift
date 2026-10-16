@@ -1,4 +1,5 @@
 import AppKit
+import UniformTypeIdentifiers
 
 /// A plain-text or Markdown file. Info.plist names this class (NSDocumentClass) for both types,
 /// so its Objective-C name is fixed.
@@ -27,6 +28,50 @@ public final class TextDocument: NSDocument {
         try super.revert(toContentsOf: url, ofType: typeName)
         for case let controller as WriterWindowController in windowControllers {
             controller.show(text)
+        }
+    }
+
+    // MARK: Export
+
+    /// Markdown documents export formatted; plain text exports as typed.
+    var isMarkdown: Bool {
+        fileType == "net.daringfireball.markdown" || ["md", "markdown"].contains(fileURL?.pathExtension.lowercased() ?? "")
+    }
+
+    func typesetForExport(settings: WriterSettings = .shared) -> NSAttributedString {
+        Exporter(settings: settings).typeset(currentText, markdown: isMarkdown)
+    }
+
+    /// Used by both File › Print and File › Export as PDF.
+    override public func printOperation(withSettings printSettings: [NSPrintInfo.AttributeKey: Any]) throws -> NSPrintOperation {
+        let info = printInfo.copy() as! NSPrintInfo
+        info.dictionary().addEntries(from: printSettings)
+        return Exporter(settings: .shared).printOperation(typesetForExport(), printInfo: info)
+    }
+
+    @objc func exportRichText(_ sender: Any?) {
+        export(as: .rtf, extension: "rtf") { try Exporter(settings: .shared).richText($0) }
+    }
+
+    @objc func exportWordDocument(_ sender: Any?) {
+        let docx = UTType("org.openxmlformats.wordprocessingml.document") ?? .data
+        export(as: docx, extension: "docx") { try Exporter(settings: .shared).wordDocument($0) }
+    }
+
+    /// Asks where to save, then writes the typeset document there.
+    private func export(as type: UTType, extension fileExtension: String, encode: @escaping (NSAttributedString) throws -> Data) {
+        guard let window = windowForSheet else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [type]
+        panel.nameFieldStringValue = ((displayName as NSString).deletingPathExtension as NSString).appendingPathExtension(fileExtension) ?? displayName
+        let text = typesetForExport()
+        panel.beginSheetModal(for: window) { [weak self] response in
+            guard response == .OK, let url = panel.url else { return }
+            do {
+                try encode(text).write(to: url, options: .atomic)
+            } catch {
+                self?.presentError(error, modalFor: window, delegate: nil, didPresent: nil, contextInfo: nil)
+            }
         }
     }
 

@@ -30,11 +30,12 @@ Or download the latest `Fallow-x.y.z.zip` from [Releases](https://github.com/rya
 - Ambient sound, all generated live with nothing recorded: **Low Field**, a warm, slowly shifting drone, or **Wind**, gusts moving across an open field
 - **Marimba** keystroke sounds: soft wooden notes on a pentatonic scale, so typing makes gentle music. Space, return and delete each have their own sound
 - A speaker button in the corner opens a small panel for choosing sounds and setting their volumes. Fallow remembers your choices
+- Export to PDF, Rich Text and Word, or print, typeset for paper. Markdown comes out formatted, with real headings, emphasis, lists and links
 - Sandboxed: Fallow can only open the files you choose
 
 <img alt="The sound panel open above the speaker button: ambient sound set to Low Field, keystroke sounds set to Marimba, each with a volume slider." src="docs/images/sound-panel.png">
 
-Coming later: more sounds and backgrounds, and export.
+Coming later: more sounds and backgrounds.
 
 ## Building
 Fallow is a Swift package and needs no Xcode project. With the Command Line Tools installed (Swift 6 or later), on macOS 13 or later:
