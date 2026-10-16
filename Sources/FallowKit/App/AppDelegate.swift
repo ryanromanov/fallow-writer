@@ -216,6 +216,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
         menu.addItem(none)
         menu.addItem(.separator())
         menu.addItem(item("Keystroke Sounds", #selector(toggleKeystrokeSounds), target: self))
+        menu.addItem(.separator())
+        // Handled by the front window's controller, through the responder chain.
+        menu.addItem(item("Volume…", #selector(WriterWindowController.showSoundPanel)))
         return menu
     }
 

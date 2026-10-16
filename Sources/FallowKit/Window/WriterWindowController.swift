@@ -9,6 +9,7 @@ final class WriterWindowController: NSWindowController, NSWindowDelegate, NSText
     private var pendingCount: DispatchWorkItem?
 
     private let sound: SoundEngine?
+    private var soundPopover: NSPopover?
 
     /// `sound` is nil in tests, which must never start the real audio engine.
     init(settings: WriterSettings = .shared, sound: SoundEngine? = nil) {
@@ -35,6 +36,9 @@ final class WriterWindowController: NSWindowController, NSWindowDelegate, NSText
         writerView.onMouseMoved = { [weak self] in self?.fader.mouseMoved(by: $0) }
         writerView.textView.apply(settings)
         writerView.textView.onKeystroke = { [weak self] in self?.sound?.keystroke($0, isRepeat: $1) }
+        writerView.soundButton.target = self
+        writerView.soundButton.action = #selector(showSoundPanel)
+        updateSoundButton()
         sound?.windowOpened()
         NotificationCenter.default.addObserver(
             self, selector: #selector(settingsDidChange), name: WriterSettings.didChange, object: settings)
@@ -58,7 +62,7 @@ final class WriterWindowController: NSWindowController, NSWindowDelegate, NSText
     /// The status line and the whole title bar container: the buttons, plus the tab bar and its
     /// background when there are tabs. In full screen the tab bar stays on screen, so it fades there too.
     private var chromeViews: [NSView] {
-        var views: [NSView] = [writerView.statusLabel]
+        var views: [NSView] = [writerView.statusLabel, writerView.soundButton]
         if let titlebar = window?.standardWindowButton(.closeButton)?.superview {
             views.append(titlebar.superview ?? titlebar)
         }
@@ -75,7 +79,30 @@ final class WriterWindowController: NSWindowController, NSWindowDelegate, NSText
         updateStatus()
     }
 
+    /// Shows the sound panel under the speaker button. Also the Sound › Volume… menu item.
+    @objc func showSoundPanel(_ sender: Any?) {
+        if let popover = soundPopover, popover.isShown {
+            popover.performClose(sender)
+            return
+        }
+        fader.show()
+        let popover = NSPopover()
+        popover.behavior = .transient
+        popover.contentViewController = SoundPanel(settings: settings)
+        popover.show(relativeTo: writerView.soundButton.bounds, of: writerView.soundButton, preferredEdge: .maxY)
+        soundPopover = popover
+    }
+
+    /// The speaker shows waves while any sound is on, and a slash when it's all off.
+    private func updateSoundButton() {
+        let on = settings.ambientSound || settings.keystrokeSounds
+        let name = on ? "speaker.wave.2" : "speaker.slash"
+        writerView.soundButton.image = NSImage(systemSymbolName: name, accessibilityDescription: on ? "Sound on" : "Sound off")
+    }
+
     @objc private func settingsDidChange() {
+        updateSoundButton()
+        writerView.statusLabel.font = settings.chromeFont(size: 11)
         writerView.textView.apply(settings)
         writerView.layoutColumn()
         if settings.typewriterScrolling { writerView.centerInsertionPoint(animated: false) }
@@ -84,6 +111,8 @@ final class WriterWindowController: NSWindowController, NSWindowDelegate, NSText
     // MARK: NSTextViewDelegate
 
     func textDidChange(_ notification: Notification) {
+        // Writing again means you're done with the sound panel.
+        if let popover = soundPopover, popover.isShown { popover.performClose(nil) }
         if window?.isKeyWindow == true { fader.typed() }
         if settings.typewriterScrolling { writerView.centerInsertionPoint(animated: true) }
         // Counting words reads the whole text, so wait for a pause in typing.

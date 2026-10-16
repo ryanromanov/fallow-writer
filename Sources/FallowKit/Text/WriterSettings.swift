@@ -84,6 +84,21 @@ public final class WriterSettings {
         set { set(newValue, for: "ambientSound") }
     }
 
+    /// Keystrokes start about 8 dB down: at full level their sharp attack stands well above the ambient sound.
+    static let defaultKeystrokeVolume: Float = 0.4
+
+    /// 0…1, applied to all keystroke sounds.
+    public var keystrokeVolume: Float {
+        get { (defaults.object(forKey: "keystrokeVolume") as? Float).map { min(max($0, 0), 1) } ?? Self.defaultKeystrokeVolume }
+        set { set(min(max(newValue, 0), 1), for: "keystrokeVolume") }
+    }
+
+    /// 0…1, applied to the ambient scene.
+    public var ambientVolume: Float {
+        get { (defaults.object(forKey: "ambientVolume") as? Float).map { min(max($0, 0), 1) } ?? 1 }
+        set { set(min(max(newValue, 0), 1), for: "ambientVolume") }
+    }
+
     public var ambientChoice: AmbientChoice {
         get { defaults.string(forKey: "ambientChoice").flatMap(AmbientChoice.init) ?? .lowField }
         set { set(newValue.rawValue, for: "ambientChoice") }
@@ -93,6 +108,18 @@ public final class WriterSettings {
         let base = NSFont.systemFont(ofSize: fontSize)
         guard let descriptor = base.fontDescriptor.withDesign(fontStyle.design) else { return base }
         return NSFont(descriptor: descriptor, size: fontSize) ?? base
+    }
+
+    /// Type for Fallow's own chrome (the status line, the sound panel) in the writing font's
+    /// family, so the page reads as one piece. Monospaced is a weight lighter, because SF Mono
+    /// looks heavy at small sizes.
+    func chromeFont(size: CGFloat, weight: NSFont.Weight = .regular, italic: Bool = false) -> NSFont {
+        let lighter: [NSFont.Weight: NSFont.Weight] = [.regular: .light, .medium: .regular, .semibold: .medium, .bold: .semibold]
+        let adjusted = fontStyle == .mono ? lighter[weight] ?? weight : weight
+        let base = NSFont.systemFont(ofSize: size, weight: adjusted).fontDescriptor
+        var descriptor = base.withDesign(fontStyle.design) ?? base
+        if italic { descriptor = descriptor.withSymbolicTraits(.italic) }
+        return NSFont(descriptor: descriptor, size: size) ?? .systemFont(ofSize: size, weight: adjusted)
     }
 
     public var paragraphStyle: NSParagraphStyle {

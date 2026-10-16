@@ -112,10 +112,16 @@ public final class SoundEngine {
 
     @objc private func settingsChanged() { update() }
 
+    private func applyVolumes() {
+        keysMixer.outputVolume = settings.keystrokeVolume
+        ambientMixer.outputVolume = settings.ambientVolume
+    }
+
     private var wanted: Bool { openWindows > 0 && (settings.keystrokeSounds || settings.ambientSound) }
 
     /// Starts or stops the engine and the ambient scene to match the settings and open windows.
     private func update() {
+        applyVolumes()
         if wanted, !engine.isRunning { start() }
         guard engine.isRunning else { return }
         if openWindows > 0, settings.ambientSound {

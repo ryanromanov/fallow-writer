@@ -71,6 +71,10 @@ import Testing
         #expect(settings.fontSize == WriterSettings.defaultFontSize)
         #expect(settings.lineSpacing == .normal)
         #expect(settings.typewriterScrolling)
+        #expect(settings.keystrokeSounds && settings.ambientSound)
+        #expect(settings.ambientChoice == .lowField)
+        #expect(settings.keystrokeVolume == WriterSettings.defaultKeystrokeVolume)
+        #expect(settings.ambientVolume == 1)
     }
 
     @Test func clampsFontSize() {

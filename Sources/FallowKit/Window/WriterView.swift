@@ -9,6 +9,8 @@ final class WriterView: NSView {
     let scrollView = NSScrollView()
     let textView: WriterTextView
     let statusLabel = NSTextField(labelWithString: "")
+    /// Opens the sound panel. It sits in the bottom-right corner and fades with the other chrome.
+    let soundButton = NSButton()
     var onMouseMoved: ((CGFloat) -> Void)?
 
     /// Text starts to dissolve this far above the bottom edge and is gone by `clearHeight`,
@@ -41,14 +43,27 @@ final class WriterView: NSView {
         fadeMask.colors = [opaque, opaque, clear, clear]
         scrollView.layer?.mask = fadeMask
 
-        statusLabel.font = .systemFont(ofSize: 11)
+        statusLabel.font = settings.chromeFont(size: 11)
         statusLabel.textColor = Palette.secondary
         statusLabel.alignment = .center
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
         addSubview(statusLabel)
+        soundButton.isBordered = false
+        soundButton.bezelStyle = .regularSquare
+        soundButton.imagePosition = .imageOnly
+        soundButton.contentTintColor = Palette.secondary
+        soundButton.setAccessibilityLabel("Sound")
+        soundButton.toolTip = "Sound"
+        soundButton.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(soundButton)
+
         NSLayoutConstraint.activate([
             statusLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
             statusLabel.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -14),
+            soundButton.centerYAnchor.constraint(equalTo: statusLabel.centerYAnchor),
+            soundButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18),
+            soundButton.widthAnchor.constraint(equalToConstant: 24),
+            soundButton.heightAnchor.constraint(equalToConstant: 20),
         ])
     }
 

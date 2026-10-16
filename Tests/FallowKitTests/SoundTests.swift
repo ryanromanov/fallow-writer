@@ -224,6 +224,20 @@ func referenceLowField(sampleRate: Double, frames: Int) -> (left: [Float], right
         #expect(rms(after) > 0.005)
     }
 
+    @Test func keystrokeVolumeScalesKeys() throws {
+        func level(volume: Float) throws -> Float {
+            let settings = makeSettings(keys: true, ambient: false)
+            settings.keystrokeVolume = volume
+            let sound = SoundEngine(settings: settings, offline: true)
+            sound.windowOpened()
+            sound.keystroke(.space)
+            return peak(try render(sound.engine, seconds: 0.3))
+        }
+        let full = try level(volume: 1), quiet = try level(volume: 0.4)
+        // Each keystroke also varies randomly between 85% and 100%, so allow for that either way.
+        #expect((0.4 * 0.84...0.4 / 0.84).contains(quiet / full))
+    }
+
     @Test func switchingScenesKeepsPlaying() throws {
         let settings = makeSettings(keys: false, ambient: true)
         let sound = SoundEngine(settings: settings, offline: true)
@@ -272,7 +286,7 @@ func referenceLowField(sampleRate: Double, frames: Int) -> (left: [Float], right
             var index = Int(random.next() % UInt64(variants.count))
             if index == last[kind], variants.count > 1 { index = (index + 1) % variants.count }
             last[kind] = index
-            let gain = 0.85 + 0.15 * (random.bipolar() + 1) / 2
+            let gain = WriterSettings.defaultKeystrokeVolume * (0.85 + 0.15 * (random.bipolar() + 1) / 2)
             let start = Int(time * rate)
             for (n, sample) in variants[index].enumerated() where start + n < keys.count { keys[start + n] += sample * gain }
             time += 0.13 + 0.06 * Double(random.bipolar())

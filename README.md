@@ -12,6 +12,7 @@ It's named after fallow ground, a field left to rest before it's planted again.
 - A live word count
 - Ambient sound, all generated live with nothing recorded: **Low Field**, a warm, slowly shifting drone, or **Wind**, gusts moving across an open field
 - **Marimba** keystroke sounds: soft wooden notes on a pentatonic scale, so typing makes gentle music. Space, return and delete each have their own sound
+- A speaker button in the corner opens a small panel for choosing sounds and setting their volumes. Fallow remembers your choices
 - Sandboxed: Fallow can only open the files you choose
 
 Coming later: more sounds and backgrounds, and export.
