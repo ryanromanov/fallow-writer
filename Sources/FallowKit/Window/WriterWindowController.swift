@@ -1,0 +1,120 @@
+import AppKit
+
+/// One document's window. The title bar is transparent and untitled; the document's name and
+/// word count live in the status line, and both fade away while you type.
+final class WriterWindowController: NSWindowController, NSWindowDelegate, NSTextViewDelegate {
+    private let settings: WriterSettings
+    let writerView: WriterView
+    private var fader: ChromeFader!
+    private var pendingCount: DispatchWorkItem?
+
+    init(settings: WriterSettings = .shared) {
+        self.settings = settings
+        writerView = WriterView(settings: settings)
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 900, height: 700),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+            backing: .buffered, defer: true)
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.collectionBehavior = [.fullScreenPrimary]
+        window.minSize = NSSize(width: 480, height: 360)
+        window.contentView = writerView
+        window.center()
+        super.init(window: window)
+
+        window.delegate = self
+        shouldCascadeWindows = true
+        windowFrameAutosaveName = "WriterWindow"
+        fader = ChromeFader { [weak self] in self?.chromeViews ?? [] }
+        writerView.textView.delegate = self
+        writerView.onMouseMoved = { [weak self] in self?.fader.mouseMoved(by: $0) }
+        writerView.textView.apply(settings)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(settingsDidChange), name: WriterSettings.didChange, object: settings)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    var currentText: String { writerView.textView.string }
+
+    /// Replaces the text, as when the document is opened or reverted.
+    func show(_ text: String) {
+        let textView = writerView.textView
+        textView.string = text
+        textView.apply(settings)
+        textView.setSelectedRange(NSRange(location: 0, length: 0))
+        writerView.layoutSubtreeIfNeeded()
+        updateStatus()
+    }
+
+    /// The title bar's buttons (outside full screen, where the system hides them itself) and the status line.
+    private var chromeViews: [NSView] {
+        var views: [NSView] = [writerView.statusLabel]
+        if let window, !window.styleMask.contains(.fullScreen),
+           let titlebar = window.standardWindowButton(.closeButton)?.superview {
+            views.append(titlebar)
+        }
+        return views
+    }
+
+    private func updateStatus() {
+        let name = (document as? NSDocument)?.displayName ?? "Untitled"
+        writerView.statusLabel.stringValue = WordCounter.status(name: name, words: WordCounter.words(in: currentText))
+    }
+
+    override func synchronizeWindowTitleWithDocumentName() {
+        super.synchronizeWindowTitleWithDocumentName()
+        updateStatus()
+    }
+
+    @objc private func settingsDidChange() {
+        writerView.textView.apply(settings)
+        writerView.layoutColumn()
+        if settings.typewriterScrolling { writerView.centerInsertionPoint(animated: false) }
+    }
+
+    // MARK: NSTextViewDelegate
+
+    func textDidChange(_ notification: Notification) {
+        if window?.isKeyWindow == true { fader.typed() }
+        if settings.typewriterScrolling { writerView.centerInsertionPoint(animated: true) }
+        // Counting words reads the whole text, so wait for a pause in typing.
+        pendingCount?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.updateStatus() }
+        pendingCount = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
+    }
+
+    func textViewDidChangeSelection(_ notification: Notification) {
+        // Follow the arrow keys, but leave the text where it is when the mouse moves the caret.
+        guard settings.typewriterScrolling, NSApp.currentEvent?.type == .keyDown else { return }
+        writerView.centerInsertionPoint(animated: true)
+    }
+
+    // MARK: NSWindowDelegate
+
+    func windowWillReturnUndoManager(_ window: NSWindow) -> UndoManager? {
+        (document as? NSDocument)?.undoManager
+    }
+
+    func windowDidResignKey(_ notification: Notification) {
+        fader.show()
+    }
+
+    func windowWillEnterFullScreen(_ notification: Notification) {
+        fader.show()
+    }
+
+    func windowDidExitFullScreen(_ notification: Notification) {
+        // The title bar may have faded while it was hidden; bring it back.
+        chromeViews.forEach { $0.alphaValue = 1 }
+    }
+
+    func windowDidResize(_ notification: Notification) {
+        guard settings.typewriterScrolling else { return }
+        writerView.layoutColumn()
+        writerView.centerInsertionPoint(animated: false)
+    }
+}

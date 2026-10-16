@@ -1,0 +1,10 @@
+.build/
+.swiftpm/
+DerivedData/
+xcuserdata/
+*.app
+.DS_Store
+
+# Planning and progress notes stay on this Mac.
+docs/PLAN.md
+docs/PROGRESS.md
