@@ -78,6 +78,12 @@ public final class WriterSettings {
         set { set(newValue, for: "typewriterScrolling") }
     }
 
+    /// Typed letters settle into place. Off whenever Reduce Motion is on, whatever this says.
+    public var animatesTyping: Bool {
+        get { defaults.object(forKey: "animatesTyping") as? Bool ?? true }
+        set { set(newValue, for: "animatesTyping") }
+    }
+
     public var keystrokeSounds: Bool {
         get { defaults.object(forKey: "keystrokeSounds") as? Bool ?? true }
         set { set(newValue, for: "keystrokeSounds") }
@@ -126,9 +132,13 @@ public final class WriterSettings {
         return NSFont(descriptor: descriptor, size: size) ?? .systemFont(ofSize: size, weight: adjusted)
     }
 
+    /// Extra space goes between lines (lineSpacing) rather than into each line's height
+    /// (lineHeightMultiple): TextKit adds a taller line's extra height above the letters, and
+    /// the insertion point grows with it.
     public var paragraphStyle: NSParagraphStyle {
         let style = NSMutableParagraphStyle()
-        style.lineHeightMultiple = lineSpacing.multiple
+        let lineHeight = font.ascender - font.descender + font.leading
+        style.lineSpacing = ((lineSpacing.multiple - 1) * lineHeight).rounded()
         // Small, because Markdown already separates paragraphs with a blank line.
         style.paragraphSpacing = (fontSize * 0.3).rounded()
         return style

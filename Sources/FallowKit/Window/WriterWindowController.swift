@@ -36,6 +36,7 @@ final class WriterWindowController: NSWindowController, NSWindowDelegate, NSText
         writerView.onMouseMoved = { [weak self] in self?.fader.mouseMoved(by: $0) }
         writerView.textView.apply(settings)
         writerView.textView.onKeystroke = { [weak self] in self?.sound?.keystroke($0, isRepeat: $1) }
+        writerView.textView.animatesTyping = { [weak self] in self?.settings.animatesTyping ?? false }
         writerView.soundButton.target = self
         writerView.soundButton.action = #selector(showSoundPanel)
         updateSoundButton()
@@ -134,15 +135,25 @@ final class WriterWindowController: NSWindowController, NSWindowDelegate, NSText
         (document as? NSDocument)?.undoManager
     }
 
+    override var document: AnyObject? {
+        didSet {
+            if let undoManager = (document as? NSDocument)?.undoManager {
+                writerView.textView.letters.watch(undoManager)
+            }
+        }
+    }
+
     func windowWillClose(_ notification: Notification) {
         sound?.windowClosed()
     }
 
     func windowDidResignKey(_ notification: Notification) {
+        writerView.textView.letters.finishAll()
         fader.show()
     }
 
     func windowWillEnterFullScreen(_ notification: Notification) {
+        writerView.textView.letters.finishAll()
         fader.show()
     }
 
@@ -153,6 +164,7 @@ final class WriterWindowController: NSWindowController, NSWindowDelegate, NSText
     }
 
     func windowDidResize(_ notification: Notification) {
+        writerView.textView.letters.finishAll()
         guard settings.typewriterScrolling else { return }
         writerView.layoutColumn()
         writerView.centerInsertionPoint(animated: false)

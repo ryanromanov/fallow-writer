@@ -44,6 +44,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
         settings.typewriterScrolling.toggle()
     }
 
+    @objc func toggleAnimatesTyping(_ sender: Any?) { settings.animatesTyping.toggle() }
+
     @objc func chooseAmbient(_ sender: NSMenuItem) {
         if let raw = sender.representedObject as? String, let choice = AmbientChoice(rawValue: raw) {
             settings.ambientChoice = choice
@@ -62,6 +64,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
             item.state = item.representedObject as? String == settings.lineSpacing.rawValue ? .on : .off
         case #selector(toggleTypewriterScrolling):
             item.state = settings.typewriterScrolling ? .on : .off
+        case #selector(toggleAnimatesTyping):
+            item.state = settings.animatesTyping ? .on : .off
+            // Reduce Motion wins; the setting is kept for when it's turned off again.
+            return !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         case #selector(chooseAmbient):
             let chosen = settings.ambientSound ? settings.ambientChoice.rawValue : nil
             item.state = item.representedObject as? String == chosen ? .on : .off
@@ -195,6 +201,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
     private func viewMenu() -> NSMenu {
         let menu = NSMenu(title: "View")
         menu.addItem(item("Typewriter Scrolling", #selector(toggleTypewriterScrolling), "t", [.command, .option], target: self))
+        menu.addItem(item("Animate Typing", #selector(toggleAnimatesTyping), target: self))
         menu.addItem(.separator())
         menu.addItem(item("Enter Full Screen", #selector(NSWindow.toggleFullScreen(_:)), "f", [.command, .control]))
         return menu

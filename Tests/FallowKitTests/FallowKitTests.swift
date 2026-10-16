@@ -98,7 +98,10 @@ import Testing
         #expect(settings.fontStyle == .mono)
         #expect(settings.lineSpacing == .double)
         #expect(!settings.typewriterScrolling)
-        #expect(settings.paragraphStyle.lineHeightMultiple == 2.0)
+        // Double spacing adds a whole line's height between lines.
+        let font = settings.font
+        #expect(settings.paragraphStyle.lineSpacing == (font.ascender - font.descender + font.leading).rounded())
+        #expect(settings.paragraphStyle.lineHeightMultiple == 0)
     }
 }
 
