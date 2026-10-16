@@ -77,6 +77,11 @@ import Testing
         #expect(settings.ambientVolume == 1)
     }
 
+    @Test func monospacedLinesAreShorter() {
+        #expect(FontStyle.mono.measure < FontStyle.serif.measure)
+        #expect(FontStyle.sans.measure == FontStyle.serif.measure)
+    }
+
     @Test func clampsFontSize() {
         let settings = makeSettings()
         settings.fontSize = 200

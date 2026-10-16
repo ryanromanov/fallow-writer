@@ -11,6 +11,10 @@ public enum FontStyle: String, CaseIterable {
         }
     }
 
+    /// The writing column's width in characters. Monospaced letters are wider, so its lines
+    /// are a little shorter to keep a comfortable measure.
+    var measure: CGFloat { self == .mono ? 60 : 66 }
+
     /// The system's own designs (New York, SF Pro, SF Mono), so Fallow bundles no font files.
     var design: NSFontDescriptor.SystemDesign {
         switch self {

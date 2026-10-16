@@ -2,8 +2,6 @@ import AppKit
 
 /// A window's content: the background, the centered writing column, and the status line.
 final class WriterView: NSView {
-    /// The column's width in characters of the current font: a comfortable reading measure.
-    static let measure: CGFloat = 66
     static let minimumMargin: CGFloat = 32
 
     let scrollView = NSScrollView()
@@ -88,15 +86,16 @@ final class WriterView: NSView {
         CATransaction.commit()
     }
 
-    /// Centers a column `measure` characters wide. With typewriter scrolling, the text gets
-    /// half a window of space above and below so any line can sit in the middle.
+    /// Centers a column as many characters wide as the font style's `measure`. With typewriter
+    /// scrolling, the text gets half a window of space above and below so any line can sit in
+    /// the middle.
     func layoutColumn() {
         let font = settings.font
         let sample = "the quick brown fox jumps over the lazy dog" as NSString
         let characterWidth = sample.size(withAttributes: [.font: font]).width / CGFloat(sample.length)
         let padding = textView.textContainer?.lineFragmentPadding ?? 0
         let size = scrollView.contentSize
-        let side = max(Self.minimumMargin, (size.width - characterWidth * Self.measure) / 2 - padding)
+        let side = max(Self.minimumMargin, (size.width - characterWidth * settings.fontStyle.measure) / 2 - padding)
         let lineHeight = font.ascender - font.descender + font.leading
         let vertical = settings.typewriterScrolling ? max(80, size.height / 2 - lineHeight) : 96
         let inset = NSSize(width: side.rounded(), height: vertical.rounded())
