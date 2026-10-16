@@ -168,14 +168,20 @@ func referenceLowField(sampleRate: Double, frames: Int) -> (left: [Float], right
         return settings
     }
 
+    /// Renders `seconds` of output. Fails the test, rather than returning silence, if the engine
+    /// has stopped or can't render, so a broken engine isn't mistaken for a quiet one.
     func render(_ engine: AVAudioEngine, seconds: Double) throws -> [Float] {
         let format = engine.manualRenderingFormat
         let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: engine.manualRenderingMaximumFrameCount)!
         var samples: [Float] = []
         var remaining = Int(seconds * format.sampleRate)
+        #expect(engine.isRunning, "the engine stopped before rendering")
         while remaining > 0 {
             let status = try engine.renderOffline(min(AVAudioFrameCount(remaining), buffer.frameCapacity), to: buffer)
-            guard status == .success else { break }
+            guard status == .success else {
+                Issue.record("offline rendering returned status \(status.rawValue) after \(samples.count) frames")
+                break
+            }
             samples += UnsafeBufferPointer(start: buffer.floatChannelData![0], count: Int(buffer.frameLength))
             remaining -= Int(buffer.frameLength)
         }

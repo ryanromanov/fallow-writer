@@ -10,6 +10,9 @@ final class WriterTextView: NSTextView {
     private(set) var letters: LetterAnimator!
     /// Whether typed letters animate; checked on every keystroke.
     var animatesTyping: () -> Bool = { false }
+    /// Reduce Motion always turns the animation off. Tests replace this, since CI machines may
+    /// have Reduce Motion on.
+    var reducesMotion: () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
     /// True while a typed character is being inserted, so `didChangeText` can tell typing
     /// from every other kind of edit.
     private var insertingTyped = false
@@ -32,9 +35,7 @@ final class WriterTextView: NSTextView {
         insertingTyped = false
         let text = (string as? NSAttributedString)?.string ?? string as? String ?? ""
         // Animate one character at a time, and never input-method text (marked text).
-        guard !composing, animatesTyping(), (text as NSString).length == 1,
-              !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-        else { return }
+        guard !composing, animatesTyping(), (text as NSString).length == 1, !reducesMotion() else { return }
         let range = NSRange(location: selectedRange().location - 1, length: 1)
         if range.location >= 0, range.location >= start - 1 { letters.animate(range) }
     }

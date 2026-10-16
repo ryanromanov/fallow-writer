@@ -18,6 +18,7 @@ import Testing
         controller.show("")
         controller.window!.orderFrontRegardless()
         let textView = controller.writerView.textView
+        textView.reducesMotion = { false }
         textView.window?.makeFirstResponder(textView)
         return (document, textView)
     }
