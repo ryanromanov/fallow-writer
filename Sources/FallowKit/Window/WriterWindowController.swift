@@ -8,8 +8,12 @@ final class WriterWindowController: NSWindowController, NSWindowDelegate, NSText
     private(set) var fader: ChromeFader!
     private var pendingCount: DispatchWorkItem?
 
-    init(settings: WriterSettings = .shared) {
+    private let sound: SoundEngine?
+
+    /// `sound` is nil in tests, which must never start the real audio engine.
+    init(settings: WriterSettings = .shared, sound: SoundEngine? = nil) {
         self.settings = settings
+        self.sound = sound
         writerView = WriterView(settings: settings)
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 900, height: 700),
@@ -30,6 +34,8 @@ final class WriterWindowController: NSWindowController, NSWindowDelegate, NSText
         writerView.textView.delegate = self
         writerView.onMouseMoved = { [weak self] in self?.fader.mouseMoved(by: $0) }
         writerView.textView.apply(settings)
+        writerView.textView.onKeystroke = { [weak self] in self?.sound?.keystroke($0, isRepeat: $1) }
+        sound?.windowOpened()
         NotificationCenter.default.addObserver(
             self, selector: #selector(settingsDidChange), name: WriterSettings.didChange, object: settings)
     }
@@ -97,6 +103,10 @@ final class WriterWindowController: NSWindowController, NSWindowDelegate, NSText
 
     func windowWillReturnUndoManager(_ window: NSWindow) -> UndoManager? {
         (document as? NSDocument)?.undoManager
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        sound?.windowClosed()
     }
 
     func windowDidResignKey(_ notification: Notification) {

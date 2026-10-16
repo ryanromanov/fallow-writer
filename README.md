@@ -10,9 +10,11 @@ It's named after fallow ground, a field left to rest before it's planted again.
 - Serif, sans serif or monospaced type (the system's own fonts), adjustable size and line spacing
 - Light and dark appearance, and native full screen (⌃⌘F)
 - A live word count
+- Ambient sound, all generated live with nothing recorded: **Low Field**, a warm, slowly shifting drone, or **Wind**, gusts moving across an open field
+- **Marimba** keystroke sounds: soft wooden notes on a pentatonic scale, so typing makes gentle music. Space, return and delete each have their own sound
 - Sandboxed: Fallow can only open the files you choose
 
-Coming later: ambient sound and keystroke sounds, more backgrounds, and export.
+Coming later: more sounds and backgrounds, and export.
 
 ## Building
 Fallow is a Swift package and needs no Xcode project. With the Command Line Tools installed (Swift 6 or later), on macOS 13 or later:
@@ -21,6 +23,7 @@ Fallow is a Swift package and needs no Xcode project. With the Command Line Tool
 scripts/bundle.sh    # builds Fallow.app
 open Fallow.app
 scripts/test.sh      # runs the tests
+scripts/audition.sh  # renders preview WAVs of the sounds into ./audition
 ```
 
 ## License

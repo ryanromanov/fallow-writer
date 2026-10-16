@@ -8,3 +8,6 @@ xcuserdata/
 # Planning and progress notes stay on this Mac.
 docs/PLAN.md
 docs/PROGRESS.md
+
+# Preview WAVs from scripts/audition.sh
+audition/

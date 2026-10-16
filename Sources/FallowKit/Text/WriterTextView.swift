@@ -3,6 +3,14 @@ import AppKit
 /// The writing surface: plain text on TextKit 2 (which the later glyph animation needs),
 /// drawn straight onto the background.
 final class WriterTextView: NSTextView {
+    /// Called for each key that should make a sound, before the text changes.
+    var onKeystroke: ((KeyClass, _ isRepeat: Bool) -> Void)?
+
+    override func keyDown(with event: NSEvent) {
+        if let kind = KeyClass(event: event) { onKeystroke?(kind, event.isARepeat) }
+        super.keyDown(with: event)
+    }
+
     /// Makes a text view sized to live in `scrollView`.
     static func make(in scrollView: NSScrollView) -> WriterTextView {
         let textView = WriterTextView(usingTextLayoutManager: true)

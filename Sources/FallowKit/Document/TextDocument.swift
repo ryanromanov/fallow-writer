@@ -10,7 +10,7 @@ public final class TextDocument: NSDocument {
     override public class var autosavesInPlace: Bool { true }
 
     override public func makeWindowControllers() {
-        let controller = WriterWindowController()
+        let controller = WriterWindowController(sound: AppDelegate.isRunningApp ? SoundEngine.shared : nil)
         addWindowController(controller)
         controller.show(text)
     }

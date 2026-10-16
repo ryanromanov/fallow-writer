@@ -4,6 +4,9 @@ import AppKit
 public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private let settings: WriterSettings
 
+    /// True once Fallow itself has launched; false under `swift test`, so tests stay silent.
+    static var isRunningApp = false
+
     override public init() {
         settings = .shared
         super.init()
@@ -12,6 +15,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
     public func applicationWillFinishLaunching(_ notification: Notification) {
         // Create the shared document controller before anything else asks for one.
         _ = NSDocumentController.shared
+        Self.isRunningApp = true
         NSApp.mainMenu = makeMainMenu()
     }
 
@@ -40,6 +44,16 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
         settings.typewriterScrolling.toggle()
     }
 
+    @objc func chooseAmbient(_ sender: NSMenuItem) {
+        if let raw = sender.representedObject as? String, let choice = AmbientChoice(rawValue: raw) {
+            settings.ambientChoice = choice
+            settings.ambientSound = true
+        } else {
+            settings.ambientSound = false
+        }
+    }
+    @objc func toggleKeystrokeSounds(_ sender: Any?) { settings.keystrokeSounds.toggle() }
+
     public func validateMenuItem(_ item: NSMenuItem) -> Bool {
         switch item.action {
         case #selector(chooseFontStyle):
@@ -48,6 +62,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
             item.state = item.representedObject as? String == settings.lineSpacing.rawValue ? .on : .off
         case #selector(toggleTypewriterScrolling):
             item.state = settings.typewriterScrolling ? .on : .off
+        case #selector(chooseAmbient):
+            let chosen = settings.ambientSound ? settings.ambientChoice.rawValue : nil
+            item.state = item.representedObject as? String == chosen ? .on : .off
+            return SoundEngine.shared.isAvailable
+        case #selector(toggleKeystrokeSounds):
+            item.state = settings.keystrokeSounds ? .on : .off
+            return SoundEngine.shared.isAvailable
         case #selector(makeTextBigger):
             return settings.fontSize < WriterSettings.fontSizes.upperBound
         case #selector(makeTextSmaller):
@@ -67,6 +88,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
         main.addItem(submenu(editMenu()))
         main.addItem(submenu(formatMenu()))
         main.addItem(submenu(viewMenu()))
+        main.addItem(submenu(soundMenu()))
         let window = windowMenu()
         main.addItem(submenu(window))
         NSApp.windowsMenu = window
@@ -175,6 +197,25 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
         menu.addItem(item("Typewriter Scrolling", #selector(toggleTypewriterScrolling), "t", [.command, .option], target: self))
         menu.addItem(.separator())
         menu.addItem(item("Enter Full Screen", #selector(NSWindow.toggleFullScreen(_:)), "f", [.command, .control]))
+        return menu
+    }
+
+    private func soundMenu() -> NSMenu {
+        let menu = NSMenu(title: "Sound")
+        let heading = NSMenuItem(title: "Ambient", action: nil, keyEquivalent: "")
+        heading.isEnabled = false
+        menu.addItem(heading)
+        for choice in AmbientChoice.allCases {
+            let entry = item(choice.title, #selector(chooseAmbient), target: self)
+            entry.representedObject = choice.rawValue
+            entry.indentationLevel = 1
+            menu.addItem(entry)
+        }
+        let none = item("None", #selector(chooseAmbient), target: self)
+        none.indentationLevel = 1
+        menu.addItem(none)
+        menu.addItem(.separator())
+        menu.addItem(item("Keystroke Sounds", #selector(toggleKeystrokeSounds), target: self))
         return menu
     }
 

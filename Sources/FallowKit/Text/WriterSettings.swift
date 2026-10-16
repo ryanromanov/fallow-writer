@@ -74,6 +74,21 @@ public final class WriterSettings {
         set { set(newValue, for: "typewriterScrolling") }
     }
 
+    public var keystrokeSounds: Bool {
+        get { defaults.object(forKey: "keystrokeSounds") as? Bool ?? true }
+        set { set(newValue, for: "keystrokeSounds") }
+    }
+
+    public var ambientSound: Bool {
+        get { defaults.object(forKey: "ambientSound") as? Bool ?? true }
+        set { set(newValue, for: "ambientSound") }
+    }
+
+    public var ambientChoice: AmbientChoice {
+        get { defaults.string(forKey: "ambientChoice").flatMap(AmbientChoice.init) ?? .lowField }
+        set { set(newValue.rawValue, for: "ambientChoice") }
+    }
+
     public var font: NSFont {
         let base = NSFont.systemFont(ofSize: fontSize)
         guard let descriptor = base.fontDescriptor.withDesign(fontStyle.design) else { return base }
