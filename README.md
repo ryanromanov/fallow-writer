@@ -11,6 +11,15 @@ A quiet place to write. Fallow is a native macOS app for distraction-free writin
 
 It's named after fallow ground, a field left to rest before it's planted again.
 
+## Install
+With [Homebrew](https://brew.sh):
+
+```sh
+brew install --cask ryanromanov/tap/fallow-writer
+```
+
+Or download the latest `Fallow-x.y.z.zip` from [Releases](https://github.com/ryanromanov/fallow-writer/releases), unzip it, and move **Fallow** to Applications. Each release is signed and notarized by Apple. Fallow runs on macOS 13 or later, on Apple Silicon and Intel Macs.
+
 ## Features
 - Plain text and Markdown files (`.txt`, `.md`), with autosave and version history
 - A centered writing column with typewriter scrolling, so the line you're typing stays in the middle of the window
