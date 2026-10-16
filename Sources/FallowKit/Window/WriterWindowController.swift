@@ -5,7 +5,7 @@ import AppKit
 final class WriterWindowController: NSWindowController, NSWindowDelegate, NSTextViewDelegate {
     private let settings: WriterSettings
     let writerView: WriterView
-    private var fader: ChromeFader!
+    private(set) var fader: ChromeFader!
     private var pendingCount: DispatchWorkItem?
 
     init(settings: WriterSettings = .shared) {
@@ -49,12 +49,12 @@ final class WriterWindowController: NSWindowController, NSWindowDelegate, NSText
         updateStatus()
     }
 
-    /// The title bar's buttons (outside full screen, where the system hides them itself) and the status line.
+    /// The status line and the whole title bar container: the buttons, plus the tab bar and its
+    /// background when there are tabs. In full screen the tab bar stays on screen, so it fades there too.
     private var chromeViews: [NSView] {
         var views: [NSView] = [writerView.statusLabel]
-        if let window, !window.styleMask.contains(.fullScreen),
-           let titlebar = window.standardWindowButton(.closeButton)?.superview {
-            views.append(titlebar)
+        if let titlebar = window?.standardWindowButton(.closeButton)?.superview {
+            views.append(titlebar.superview ?? titlebar)
         }
         return views
     }
@@ -108,7 +108,8 @@ final class WriterWindowController: NSWindowController, NSWindowDelegate, NSText
     }
 
     func windowDidExitFullScreen(_ notification: Notification) {
-        // The title bar may have faded while it was hidden; bring it back.
+        // AppKit moves the title bar back from full screen; make sure it isn't left faded.
+        fader.show()
         chromeViews.forEach { $0.alphaValue = 1 }
     }
 
