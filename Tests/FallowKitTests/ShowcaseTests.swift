@@ -83,7 +83,8 @@ import Testing
         backdrop.orderOut(nil)
     }
 
-    /// 1280×640, GitHub's social preview size: the name and tagline on the light background.
+    /// 1280×640, GitHub's social preview size: the icon, name and tagline on the light
+    /// background. The icon comes from docs/images/icon.png, which screenshots.sh draws first.
     @Test func socialPreview() throws {
         guard let folder else { return }
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -97,8 +98,18 @@ import Testing
         background.frame = content.bounds
         content.addSubview(background)
 
+        let icon = NSImageView(image: try #require(NSImage(contentsOf: folder.appendingPathComponent("icon.png"))))
+        icon.imageScaling = .scaleProportionallyUpOrDown
+        // The icon's sky is the card's own color, so a soft shadow, as in the Dock, outlines it.
+        let shadow = NSShadow()
+        shadow.shadowColor = NSColor(srgbRed: 0.24, green: 0.16, blue: 0.1, alpha: 0.28)
+        shadow.shadowOffset = NSSize(width: 0, height: -3)
+        shadow.shadowBlurRadius = 9
+        icon.shadow = shadow
+        icon.widthAnchor.constraint(equalToConstant: 68).isActive = true
+        icon.heightAnchor.constraint(equalToConstant: 68).isActive = true
         let title = NSTextField(labelWithString: "Fallow")
-        title.font = SoundPanel.serif(size: 76)
+        title.font = SoundPanel.serif(size: 64)
         title.textColor = Palette.text
         let tagline = NSTextField(labelWithString: "A quiet place to write")
         tagline.font = SoundPanel.serif(size: 21, italic: true)
@@ -106,15 +117,16 @@ import Testing
         let platform = NSTextField(labelWithAttributedString: NSAttributedString(
             string: "FOR MACOS · OPEN SOURCE",
             attributes: [.font: NSFont.systemFont(ofSize: 10, weight: .semibold), .kern: 1.6, .foregroundColor: Palette.secondary]))
-        let stack = NSStackView(views: [title, tagline, platform])
+        let stack = NSStackView(views: [icon, title, tagline, platform])
         stack.orientation = .vertical
-        stack.spacing = 6
-        stack.setCustomSpacing(26, after: tagline)
+        stack.spacing = 4
+        stack.setCustomSpacing(14, after: icon)
+        stack.setCustomSpacing(22, after: tagline)
         stack.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(stack)
         NSLayoutConstraint.activate([
             stack.centerXAnchor.constraint(equalTo: content.centerXAnchor),
-            stack.centerYAnchor.constraint(equalTo: content.centerYAnchor, constant: -4),
+            stack.centerYAnchor.constraint(equalTo: content.centerYAnchor),
         ])
         window.contentView = content
         window.orderFrontRegardless()

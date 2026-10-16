@@ -5,8 +5,9 @@
 set -eu
 cd "$(dirname "$0")/.."
 mkdir -p docs/images
-FALLOW_SHOWCASE="$PWD/docs/images" scripts/test.sh --filter ShowcaseTests
+# The icon first: the social preview shows it.
 swift scripts/make-icon.swift "${TMPDIR:-/tmp}/FallowIcon.icns" docs/images/icon.png
+FALLOW_SHOWCASE="$PWD/docs/images" scripts/test.sh --filter ShowcaseTests
 # GitHub shows README images about 900 pixels wide; 1800 stays sharp on Retina screens and
 # keeps each file small, since every regenerated image stays in the repository's history.
 for image in docs/images/writing-light.png docs/images/writing-dark.png docs/images/sound-panel.png; do
