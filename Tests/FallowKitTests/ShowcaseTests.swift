@@ -34,7 +34,7 @@ import Testing
         let controller = WriterWindowController(settings: settings)
         document.addWindowController(controller)
         controller.window!.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
-        controller.window!.setFrame(NSRect(x: 120, y: 120, width: 1000, height: 640), display: true)
+        controller.window!.setFrame(NSRect(x: 120, y: 240, width: 1000, height: 640), display: true)
         controller.show(Self.passage)
         controller.window!.orderFrontRegardless()
         RunLoop.main.run(until: Date().addingTimeInterval(0.8))
@@ -66,10 +66,19 @@ import Testing
         let area = NSRect(x: writing.minX - 36, y: writing.minY - 36, width: writing.width + 290, height: writing.height + 72)
         let backdrop = NSWindow(contentRect: area, styleMask: [.borderless], backing: .buffered, defer: false)
         backdrop.backgroundColor = NSColor(srgbRed: 0.80, green: 0.77, blue: 0.71, alpha: 1)
+        // Float all three above other apps' windows, since the test runner can't make itself
+        // the active app and another app's window could otherwise cover the area.
+        backdrop.level = .floating
         backdrop.orderFrontRegardless()
+        controller.window!.level = NSWindow.Level(NSWindow.Level.floating.rawValue + 1)
         controller.window!.orderFrontRegardless()
-        controller.showSoundPanel(nil)
+        controller.showAtmospherePanel(nil)
         RunLoop.main.run(until: Date().addingTimeInterval(0.8))
+        for panel in NSApp.windows where panel !== backdrop && panel !== controller.window && panel.isVisible {
+            panel.level = NSWindow.Level(NSWindow.Level.floating.rawValue + 2)
+            panel.orderFrontRegardless()
+        }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
         let screen = NSScreen.screens[0].frame
         // Stay a few points inside the backdrop, so rounding can't reach past its edge.
         let inner = area.insetBy(dx: 4, dy: 4)
@@ -81,6 +90,18 @@ import Testing
         process.waitUntilExit()
         document.close()
         backdrop.orderOut(nil)
+        // If anything else got into the shot (another app's window, the Dock), its corners
+        // aren't the backdrop's color: fail rather than leave someone else's screen in the
+        // README. The image's pixel values are compared as stored, without its color profile.
+        let shot = try #require(NSBitmapImageRep(data: Data(contentsOf: folder.appendingPathComponent("sound-panel.png"))))
+        let expected = backdrop.backgroundColor!
+        for (x, y) in [(2, 2), (shot.pixelsWide - 3, 2), (2, shot.pixelsHigh - 3), (shot.pixelsWide - 3, shot.pixelsHigh - 3)] {
+            let corner = try #require(shot.colorAt(x: x, y: y))
+            #expect(abs(corner.redComponent - expected.redComponent) < 0.03
+                && abs(corner.greenComponent - expected.greenComponent) < 0.03
+                && abs(corner.blueComponent - expected.blueComponent) < 0.03,
+                "The panel screenshot caught something other than Fallow's backdrop at \(x), \(y)")
+        }
     }
 
     /// 1280×640, GitHub's social preview size: the icon, name and tagline on the light
@@ -94,7 +115,7 @@ import Testing
                               styleMask: [.borderless], backing: .buffered, defer: false)
         window.appearance = NSAppearance(named: .aqua)
         let content = NSView(frame: NSRect(origin: .zero, size: size))
-        let background = BackgroundView(background: GradientBackground())
+        let background = BackgroundView()
         background.frame = content.bounds
         content.addSubview(background)
 
@@ -109,10 +130,10 @@ import Testing
         icon.widthAnchor.constraint(equalToConstant: 68).isActive = true
         icon.heightAnchor.constraint(equalToConstant: 68).isActive = true
         let title = NSTextField(labelWithString: "Fallow")
-        title.font = SoundPanel.serif(size: 64)
+        title.font = AtmospherePanel.serif(size: 64)
         title.textColor = Palette.text
         let tagline = NSTextField(labelWithString: "A quiet place to write")
-        tagline.font = SoundPanel.serif(size: 21, italic: true)
+        tagline.font = AtmospherePanel.serif(size: 21, italic: true)
         tagline.textColor = Palette.secondary
         let platform = NSTextField(labelWithAttributedString: NSAttributedString(
             string: "FOR MACOS · OPEN SOURCE",

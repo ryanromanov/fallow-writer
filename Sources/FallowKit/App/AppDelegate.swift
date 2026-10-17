@@ -46,6 +46,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
 
     @objc func toggleAnimatesTyping(_ sender: Any?) { settings.animatesTyping.toggle() }
 
+    @objc func chooseScene(_ sender: NSMenuItem) {
+        if let raw = sender.representedObject as? String, let choice = SceneChoice(rawValue: raw) {
+            settings.sceneChoice = choice
+        }
+    }
+
     @objc func chooseAmbient(_ sender: NSMenuItem) {
         if let raw = sender.representedObject as? String, let choice = AmbientChoice(rawValue: raw) {
             settings.ambientChoice = choice
@@ -64,6 +70,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
             item.state = item.representedObject as? String == settings.lineSpacing.rawValue ? .on : .off
         case #selector(toggleTypewriterScrolling):
             item.state = settings.typewriterScrolling ? .on : .off
+        case #selector(chooseScene):
+            item.state = item.representedObject as? String == settings.sceneChoice.rawValue ? .on : .off
         case #selector(toggleAnimatesTyping):
             item.state = settings.animatesTyping ? .on : .off
             // Reduce Motion wins; the setting is kept for when it's turned off again.
@@ -210,6 +218,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
         let menu = NSMenu(title: "View")
         menu.addItem(item("Typewriter Scrolling", #selector(toggleTypewriterScrolling), "t", [.command, .option], target: self))
         menu.addItem(item("Animate Typing", #selector(toggleAnimatesTyping), target: self))
+        let scenes = NSMenu(title: "Scene")
+        for choice in SceneChoice.allCases {
+            if choice == .drift { scenes.addItem(.separator()) }
+            let entry = item(choice.menuTitle, #selector(chooseScene), target: self)
+            entry.representedObject = choice.rawValue
+            scenes.addItem(entry)
+        }
+        menu.addItem(submenu(scenes))
         menu.addItem(.separator())
         menu.addItem(item("Enter Full Screen", #selector(NSWindow.toggleFullScreen(_:)), "f", [.command, .control]))
         return menu
@@ -233,7 +249,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
         menu.addItem(item("Keystroke Sounds", #selector(toggleKeystrokeSounds), target: self))
         menu.addItem(.separator())
         // Handled by the front window's controller, through the responder chain.
-        menu.addItem(item("Volume…", #selector(WriterWindowController.showSoundPanel)))
+        menu.addItem(item("Scene and Sound…", #selector(WriterWindowController.showAtmospherePanel)))
         return menu
     }
 

@@ -38,7 +38,7 @@ final class WriterWindowController: NSWindowController, NSWindowDelegate, NSText
         writerView.textView.onKeystroke = { [weak self] in self?.sound?.keystroke($0, isRepeat: $1) }
         writerView.textView.animatesTyping = { [weak self] in self?.settings.animatesTyping ?? false }
         writerView.soundButton.target = self
-        writerView.soundButton.action = #selector(showSoundPanel)
+        writerView.soundButton.action = #selector(showAtmospherePanel)
         updateSoundButton()
         sound?.windowOpened()
         NotificationCenter.default.addObserver(
@@ -81,7 +81,7 @@ final class WriterWindowController: NSWindowController, NSWindowDelegate, NSText
     }
 
     /// Shows the sound panel under the speaker button. Also the Sound › Volume… menu item.
-    @objc func showSoundPanel(_ sender: Any?) {
+    @objc func showAtmospherePanel(_ sender: Any?) {
         if let popover = soundPopover, popover.isShown {
             popover.performClose(sender)
             return
@@ -89,7 +89,7 @@ final class WriterWindowController: NSWindowController, NSWindowDelegate, NSText
         fader.show()
         let popover = NSPopover()
         popover.behavior = .transient
-        popover.contentViewController = SoundPanel(settings: settings)
+        popover.contentViewController = AtmospherePanel(settings: settings)
         popover.show(relativeTo: writerView.soundButton.bounds, of: writerView.soundButton, preferredEdge: .maxY)
         soundPopover = popover
     }
@@ -104,6 +104,7 @@ final class WriterWindowController: NSWindowController, NSWindowDelegate, NSText
     @objc private func settingsDidChange() {
         updateSoundButton()
         writerView.statusLabel.font = settings.chromeFont(size: 11)
+        writerView.backgroundView.choice = settings.sceneChoice
         writerView.textView.apply(settings)
         writerView.layoutColumn()
         if settings.typewriterScrolling { writerView.centerInsertionPoint(animated: false) }

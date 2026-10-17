@@ -109,6 +109,12 @@ public final class WriterSettings {
         set { set(min(max(newValue, 0), 1), for: "ambientVolume") }
     }
 
+    /// The scene behind the text, or Drift.
+    public var sceneChoice: SceneChoice {
+        get { defaults.string(forKey: "sceneChoice").flatMap(SceneChoice.init) ?? .paper }
+        set { set(newValue.rawValue, for: "sceneChoice") }
+    }
+
     public var ambientChoice: AmbientChoice {
         get { defaults.string(forKey: "ambientChoice").flatMap(AmbientChoice.init) ?? .lowField }
         set { set(newValue.rawValue, for: "ambientChoice") }

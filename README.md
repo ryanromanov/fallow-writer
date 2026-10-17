@@ -25,17 +25,18 @@ Or download the latest `Fallow-x.y.z.zip` from [Releases](https://github.com/rya
 - A centered writing column with typewriter scrolling, so the line you're typing stays in the middle of the window
 - Serif, sans serif or monospaced type (the system's own fonts), adjustable size and line spacing
 - Light and dark appearance, and native full screen (⌃⌘F)
+- Five scenes behind the text: **Paper**, **Dusk**, **Mist** and **Meadow**, soft color washes that each have a light and a dark version, and **Drift**, a slow chromotherapy loop that blends from one scene to the next while you write
 - A live word count
 - Letters settle softly into place as you type (View › Animate Typing; off when Reduce Motion is on)
 - Ambient sound, all generated live with nothing recorded: **Low Field**, a warm, slowly shifting drone, or **Wind**, gusts moving across an open field
 - **Marimba** keystroke sounds: soft wooden notes on a pentatonic scale, so typing makes gentle music. Space, return and delete each have their own sound
-- A speaker button in the corner opens a small panel for choosing sounds and setting their volumes. Fallow remembers your choices
+- A speaker button in the corner opens a small panel for choosing the scene and sounds and setting their volumes. Fallow remembers your choices
 - Export to PDF, Rich Text and Word, or print, typeset for paper. Markdown comes out formatted, with real headings, emphasis, lists and links
 - Sandboxed: Fallow can only open the files you choose
 
-<img alt="The sound panel open above the speaker button: ambient sound set to Low Field, keystroke sounds set to Marimba, each with a volume slider." src="docs/images/sound-panel.png">
+<img alt="The scene and sound panel open above the speaker button: scene set to Paper, ambient sound set to Low Field, keystroke sounds set to Marimba, each sound with a volume slider." src="docs/images/sound-panel.png">
 
-Coming later: more sounds and backgrounds.
+Coming later: more sounds and scenes.
 
 ## Building
 Fallow is a Swift package and needs no Xcode project. With the Command Line Tools installed (Swift 6 or later), on macOS 13 or later:

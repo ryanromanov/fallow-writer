@@ -1,12 +1,14 @@
 import AppKit
 
-/// The speaker button's popover: which ambient scene and keystroke sounds play, and how loud.
-/// Every change is saved at once, and the panel follows changes made from the Sound menu.
+/// The speaker button's popover: the scene behind the text, which ambient sound and keystroke
+/// sounds play, and how loud. Every change is saved at once, and the panel follows changes made
+/// from the menus.
 ///
 /// The controls are native (so VoiceOver, the keyboard and accessibility settings all work),
 /// styled in Fallow's own colors and in the writing font's family rather than as a settings window.
-final class SoundPanel: NSViewController {
+final class AtmospherePanel: NSViewController {
     private let settings: WriterSettings
+    let sceneChoices: ChoiceRow
     let ambientChoices: ChoiceRow
     let keysChoices: ChoiceRow
     let ambientSlider = NSSlider(value: 1, minValue: 0, maxValue: 1, target: nil, action: nil)
@@ -16,6 +18,9 @@ final class SoundPanel: NSViewController {
 
     init(settings: WriterSettings) {
         self.settings = settings
+        sceneChoices = ChoiceRow(
+            settings: settings, label: "Scene",
+            options: SceneChoice.allCases.map { ($0.title, $0.rawValue) })
         ambientChoices = ChoiceRow(
             settings: settings, label: "Ambient sound",
             options: AmbientChoice.allCases.map { ($0.title, $0.rawValue) } + [("Off", nil)])
@@ -27,6 +32,10 @@ final class SoundPanel: NSViewController {
     required init?(coder: NSCoder) { fatalError() }
 
     override func loadView() {
+        sceneChoices.onChoose = { [weak self] id in
+            if let id, let choice = SceneChoice(rawValue: id) { self?.settings.sceneChoice = choice }
+        }
+        sceneChoices.buttons.last?.toolTip = "Chromotherapy: drifts slowly from scene to scene"
         ambientChoices.onChoose = { [weak self] id in
             guard let self else { return }
             if let id, let choice = AmbientChoice(rawValue: id) {
@@ -52,6 +61,7 @@ final class SoundPanel: NSViewController {
         note.textColor = Palette.secondary
 
         let stack = NSStackView(views: [
+            section("Scene", sceneChoices, nil),
             section("Ambient", ambientChoices, volume(ambientSlider)),
             section("Keystrokes", keysChoices, volume(keysSlider)),
             note,
@@ -85,10 +95,10 @@ final class SoundPanel: NSViewController {
     }
 
     /// A small letter-spaced heading over a row of choices and its volume slider.
-    private func section(_ title: String, _ choices: ChoiceRow, _ volume: NSView) -> NSView {
+    private func section(_ title: String, _ choices: ChoiceRow, _ volume: NSView?) -> NSView {
         let heading = NSTextField(labelWithString: "")
         headings.append((heading, title))
-        let stack = NSStackView(views: [heading, choices, volume])
+        let stack = NSStackView(views: [heading, choices] + (volume.map { [$0] } ?? []))
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 6
@@ -110,6 +120,7 @@ final class SoundPanel: NSViewController {
     }
 
     @objc private func refresh() {
+        sceneChoices.selected = settings.sceneChoice.rawValue
         for (label, title) in headings {
             label.attributedStringValue = NSAttributedString(string: title.uppercased(), attributes: [
                 .font: settings.chromeFont(size: 10, weight: .semibold), .kern: 1.2, .foregroundColor: Palette.secondary,

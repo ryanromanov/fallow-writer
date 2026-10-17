@@ -2,13 +2,13 @@ import AppKit
 import Testing
 @testable import FallowKit
 
-@Suite @MainActor struct SoundPanelTests {
-    func makePanel() -> (SoundPanel, WriterSettings) {
+@Suite @MainActor struct AtmospherePanelTests {
+    func makePanel() -> (AtmospherePanel, WriterSettings) {
         let name = "FallowPanelTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!
         defaults.removePersistentDomain(forName: name)
         let settings = WriterSettings(defaults: defaults)
-        let panel = SoundPanel(settings: settings)
+        let panel = AtmospherePanel(settings: settings)
         _ = panel.view
         return (panel, settings)
     }

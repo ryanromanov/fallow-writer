@@ -6,6 +6,7 @@ final class WriterView: NSView {
 
     let scrollView = NSScrollView()
     let textView: WriterTextView
+    let backgroundView = BackgroundView()
     let statusLabel = NSTextField(labelWithString: "")
     /// Opens the sound panel. It sits in the bottom-right corner and fades with the other chrome.
     let soundButton = NSButton()
@@ -29,8 +30,8 @@ final class WriterView: NSView {
         scrollView.documentView = textView
         super.init(frame: NSRect(x: 0, y: 0, width: 900, height: 700))
 
-        let background = BackgroundView(background: GradientBackground())
-        for view in [background, scrollView] as [NSView] {
+        backgroundView.choice = settings.sceneChoice
+        for view in [backgroundView, scrollView] as [NSView] {
             view.frame = bounds
             view.autoresizingMask = [.width, .height]
             addSubview(view)
@@ -50,8 +51,8 @@ final class WriterView: NSView {
         soundButton.bezelStyle = .regularSquare
         soundButton.imagePosition = .imageOnly
         soundButton.contentTintColor = Palette.secondary
-        soundButton.setAccessibilityLabel("Sound")
-        soundButton.toolTip = "Sound"
+        soundButton.setAccessibilityLabel("Scene and sound")
+        soundButton.toolTip = "Scene and sound"
         soundButton.translatesAutoresizingMaskIntoConstraints = false
         addSubview(soundButton)
 
