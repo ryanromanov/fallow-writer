@@ -24,7 +24,7 @@ import Testing
     @Test func choicesAndVolumesReachSettings() {
         let (panel, settings) = makePanel()
         click(panel.ambientChoices, "Wind")
-        #expect(settings.ambientChoice == .wind && settings.ambientSound)
+        #expect(settings.ambientChoice == "wind" && settings.ambientSound)
         #expect(chosen(panel.ambientChoices) == ["Wind"])
         click(panel.ambientChoices, "Off")
         #expect(!settings.ambientSound)
@@ -46,7 +46,7 @@ import Testing
         #expect(chosen(panel.ambientChoices) == ["Low Field"])
         #expect(chosen(panel.keysChoices) == ["Marimba"])
         #expect(panel.keysSlider.floatValue == WriterSettings.defaultKeystrokeVolume)
-        settings.ambientChoice = .wind
+        settings.ambientChoice = "wind"
         #expect(chosen(panel.ambientChoices) == ["Wind"])
         settings.ambientSound = false
         #expect(chosen(panel.ambientChoices) == ["Off"])

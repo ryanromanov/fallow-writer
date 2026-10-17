@@ -16,13 +16,14 @@ import Testing
     }
 
     /// Text stays easy to read on every scene, day and night: at least 7:1, WCAG's AAA level.
-    @Test(arguments: SceneChoice.scenes)
-    func textIsReadable(scene: SceneChoice) {
+    @Test(arguments: BuiltIn.pack.scenes.map(\.id))
+    func textIsReadable(id: String) {
+        let scene = BuiltIn.pack.scenes.first { $0.id == id }!
         for dark in [false, true] {
             let appearance = NSAppearance(named: dark ? .darkAqua : .aqua)!
             var ink = CGColor(gray: 0, alpha: 1)
             appearance.performAsCurrentDrawingAppearance { ink = Palette.text.cgColor }
-            let palette = scene.palette(dark: dark)!
+            let palette = scene.palette(dark: dark)
             for hex in [palette.top, palette.middle, palette.bottom] {
                 #expect(contrast(ink, ScenePalette.color(hex)) >= 7, "\(scene.title), dark: \(dark)")
             }
@@ -30,10 +31,9 @@ import Testing
     }
 
     @Test func everySceneHasDayAndNight() {
-        for scene in SceneChoice.scenes {
+        for scene in BuiltIn.pack.scenes {
             #expect(scene.palette(dark: false) != scene.palette(dark: true))
         }
-        #expect(SceneChoice.drift.palette(dark: false) == nil)
     }
 
     @Test func driftRunsOnlyWhenChosen() {
@@ -43,9 +43,9 @@ import Testing
         view.frame = window.contentView!.bounds
         window.contentView!.addSubview(view)
         #expect(!view.isDrifting)
-        view.choice = .drift
+        view.choice = Library.driftID
         #expect(view.isDrifting)
-        view.choice = .mist
+        view.choice = "mist"
         #expect(!view.isDrifting)
     }
 
@@ -54,13 +54,13 @@ import Testing
         let defaults = UserDefaults(suiteName: name)!
         defaults.removePersistentDomain(forName: name)
         let settings = WriterSettings(defaults: defaults)
-        #expect(settings.sceneChoice == .paper)
+        #expect(settings.sceneChoice == "paper")
 
         let panel = AtmospherePanel(settings: settings)
         _ = panel.view
         #expect(panel.sceneChoices.buttons.map(\.title) == ["Paper", "Dusk", "Mist", "Meadow", "Drift"])
         panel.sceneChoices.buttons.first { $0.title == "Mist" }!.performClick(nil)
-        #expect(settings.sceneChoice == .mist)
+        #expect(settings.sceneChoice == "mist")
         #expect(panel.sceneChoices.buttons.filter(\.isChosen).map(\.title) == ["Mist"])
     }
 }

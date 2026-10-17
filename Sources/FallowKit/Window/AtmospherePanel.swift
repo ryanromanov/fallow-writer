@@ -8,6 +8,7 @@ import AppKit
 /// styled in Fallow's own colors and in the writing font's family rather than as a settings window.
 final class AtmospherePanel: NSViewController {
     private let settings: WriterSettings
+    private let library: Library
     let sceneChoices: ChoiceRow
     let ambientChoices: ChoiceRow
     let keysChoices: ChoiceRow
@@ -16,15 +17,12 @@ final class AtmospherePanel: NSViewController {
     private var headings: [(label: NSTextField, title: String)] = []
     private let note = NSTextField(labelWithString: "Sounds best with headphones")
 
-    init(settings: WriterSettings) {
+    init(settings: WriterSettings, library: Library = .shared) {
         self.settings = settings
-        sceneChoices = ChoiceRow(
-            settings: settings, label: "Scene",
-            options: SceneChoice.allCases.map { ($0.title, $0.rawValue) })
-        ambientChoices = ChoiceRow(
-            settings: settings, label: "Ambient sound",
-            options: AmbientChoice.allCases.map { ($0.title, $0.rawValue) } + [("Off", nil)])
-        keysChoices = ChoiceRow(settings: settings, label: "Keystroke sounds", options: [("Marimba", "marimba"), ("Off", nil)])
+        self.library = library
+        sceneChoices = ChoiceRow(settings: settings, label: "Scene")
+        ambientChoices = ChoiceRow(settings: settings, label: "Ambient sound")
+        keysChoices = ChoiceRow(settings: settings, label: "Keystroke sounds")
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -33,19 +31,18 @@ final class AtmospherePanel: NSViewController {
 
     override func loadView() {
         sceneChoices.onChoose = { [weak self] id in
-            if let id, let choice = SceneChoice(rawValue: id) { self?.settings.sceneChoice = choice }
+            guard let self, let id else { return }
+            library.chooseScene(id, in: settings)
         }
-        sceneChoices.buttons.last?.toolTip = "Chromotherapy: drifts slowly from scene to scene"
         ambientChoices.onChoose = { [weak self] id in
             guard let self else { return }
-            if let id, let choice = AmbientChoice(rawValue: id) {
-                settings.ambientChoice = choice
-                settings.ambientSound = true
-            } else {
-                settings.ambientSound = false
-            }
+            library.chooseAmbience(id, in: settings)
         }
-        keysChoices.onChoose = { [weak self] id in self?.settings.keystrokeSounds = id != nil }
+        keysChoices.onChoose = { [weak self] id in
+            guard let self else { return }
+            library.chooseKeystrokes(id, in: settings)
+        }
+        fillChoices()
 
         for slider in [ambientSlider, keysSlider] {
             slider.isContinuous = true
@@ -84,6 +81,24 @@ final class AtmospherePanel: NSViewController {
         refresh()
         NotificationCenter.default.addObserver(
             self, selector: #selector(refresh), name: WriterSettings.didChange, object: settings)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(libraryChanged), name: Library.didChange, object: library)
+    }
+
+    /// Every scene and sound in the library, with those from locked packs marked.
+    private func fillChoices() {
+        func option(_ title: String, _ id: String) -> ChoiceRow.Option {
+            ChoiceRow.Option(title: title, id: id, isLocked: !library.isAvailable(id))
+        }
+        sceneChoices.options = library.scenes.map { option($0.title, $0.id) } + [option("Drift", Library.driftID)]
+        sceneChoices.buttons.last?.toolTip = "Chromotherapy: drifts slowly from scene to scene"
+        ambientChoices.options = library.ambiences.map { option($0.title, $0.id) } + [.off]
+        keysChoices.options = library.keystrokeSets.map { option($0.title, $0.id) } + [.off]
+    }
+
+    @objc private func libraryChanged() {
+        fillChoices()
+        refresh()
     }
 
     /// The system's serif (New York), for Fallow's own name and artwork.
@@ -120,15 +135,15 @@ final class AtmospherePanel: NSViewController {
     }
 
     @objc private func refresh() {
-        sceneChoices.selected = settings.sceneChoice.rawValue
+        sceneChoices.selected = library.resolvedSceneID(settings.sceneChoice)
         for (label, title) in headings {
             label.attributedStringValue = NSAttributedString(string: title.uppercased(), attributes: [
                 .font: settings.chromeFont(size: 10, weight: .semibold), .kern: 1.2, .foregroundColor: Palette.secondary,
             ])
         }
         note.font = settings.chromeFont(size: 12, italic: true)
-        ambientChoices.selected = settings.ambientSound ? settings.ambientChoice.rawValue : nil
-        keysChoices.selected = settings.keystrokeSounds ? "marimba" : nil
+        ambientChoices.selected = settings.ambientSound ? library.ambience(for: settings.ambientChoice).id : nil
+        keysChoices.selected = settings.keystrokeSounds ? library.keystrokeSet(for: settings.keystrokeChoice).id : nil
         ambientSlider.floatValue = settings.ambientVolume
         keysSlider.floatValue = settings.keystrokeVolume
         ambientSlider.isEnabled = settings.ambientSound
@@ -144,25 +159,46 @@ final class AtmospherePanel: NSViewController {
 /// Choices set as words in a line, "Low Field · Wind · Off": the chosen one in full ink, the
 /// rest faded. Each word is a real button that VoiceOver reads as a radio button.
 final class ChoiceRow: NSStackView {
+    struct Option {
+        let title: String
+        /// Nil for "Off".
+        let id: String?
+        /// From a pack that isn't unlocked: shown with a lock, and choosing it offers the pack.
+        var isLocked = false
+
+        static let off = Option(title: "Off", id: nil)
+    }
+
     /// Called with the chosen option's id, or nil for "Off".
     var onChoose: ((String?) -> Void)?
     private(set) var buttons: [ChoiceButton] = []
-    private let ids: [String?]
     private let settings: WriterSettings
     private var dots: [NSTextField] = []
+
+    var options: [Option] = [] {
+        didSet { rebuild() }
+    }
 
     /// Setting this also picks up a change of writing font.
     var selected: String? {
         didSet { restyle() }
     }
 
-    init(settings: WriterSettings, label: String, options: [(title: String, id: String?)]) {
+    init(settings: WriterSettings, label: String) {
         self.settings = settings
-        ids = options.map(\.id)
         super.init(frame: .zero)
         spacing = 7
         setAccessibilityRole(.radioGroup)
         setAccessibilityLabel(label)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    private func rebuild() {
+        for view in arrangedSubviews { view.removeFromSuperview() }
+        buttons = []
+        dots = []
         for (index, option) in options.enumerated() {
             if index > 0 {
                 let dot = NSTextField(labelWithString: "·")
@@ -173,18 +209,18 @@ final class ChoiceRow: NSStackView {
             }
             let button = ChoiceButton(title: option.title, target: self, action: #selector(chose))
             button.tag = index
+            button.isLocked = option.isLocked
             buttons.append(button)
             addArrangedSubview(button)
         }
         restyle()
     }
 
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError() }
-
     @objc private func chose(_ sender: NSButton) {
-        selected = ids[sender.tag]
-        onChoose?(selected)
+        let option = options[sender.tag]
+        // A locked choice isn't selected here: the settings change only once it's unlocked.
+        if !option.isLocked { selected = option.id }
+        onChoose?(option.id)
     }
 
     private func restyle() {
@@ -192,7 +228,7 @@ final class ChoiceRow: NSStackView {
         for dot in dots { dot.font = font }
         for (index, button) in buttons.enumerated() {
             button.font = font
-            button.isChosen = ids[index] == selected
+            button.isChosen = options[index].id == selected
         }
     }
 }
@@ -200,6 +236,9 @@ final class ChoiceRow: NSStackView {
 /// One word in a ChoiceRow.
 final class ChoiceButton: NSButton {
     var isChosen = false {
+        didSet { style() }
+    }
+    var isLocked = false {
         didSet { style() }
     }
 
@@ -215,11 +254,20 @@ final class ChoiceButton: NSButton {
     }
 
     private func style() {
-        attributedTitle = NSAttributedString(string: title, attributes: [
-            .font: font ?? NSFont.systemFont(ofSize: 14),
-            .foregroundColor: isChosen ? Palette.text : Palette.secondary,
-        ])
+        let font = font ?? NSFont.systemFont(ofSize: 14)
+        let color = isChosen ? Palette.text : Palette.secondary
+        let styled = NSMutableAttributedString(string: title, attributes: [.font: font, .foregroundColor: color])
+        if isLocked, let lock = NSImage(systemSymbolName: "lock.fill", accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: font.pointSize * 0.6, weight: .regular)) {
+            let attachment = NSTextAttachment()
+            attachment.image = lock
+            styled.append(NSAttributedString(string: "\u{2009}"))
+            styled.append(NSAttributedString(attachment: attachment))
+            styled.addAttribute(.foregroundColor, value: color, range: NSRange(location: 0, length: styled.length))
+        }
+        attributedTitle = styled
         setAccessibilityValue(isChosen ? 1 : 0)
+        setAccessibilityHelp(isLocked ? "Locked. Choose to unlock." : nil)
     }
 
     override func resetCursorRects() {

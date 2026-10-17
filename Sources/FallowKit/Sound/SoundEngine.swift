@@ -17,6 +17,7 @@ public final class SoundEngine {
 
     let engine = AVAudioEngine()
     private let settings: WriterSettings
+    private let library: Library
     private let offline: Bool
     private let keysMixer = AVAudioMixerNode()
     private let ambientMixer = AVAudioMixerNode()
@@ -24,17 +25,19 @@ public final class SoundEngine {
     private let limiter = AVAudioUnitEffect(audioComponentDescription: AudioComponentDescription(
         componentType: kAudioUnitType_Effect, componentSubType: kAudioUnitSubType_PeakLimiter,
         componentManufacturer: kAudioUnitManufacturer_Apple, componentFlags: 0, componentFlagsMask: 0))
-    private let keyFormat = AVAudioFormat(standardFormatWithSampleRate: MarimbaKeystrokes.sampleRate, channels: 1)!
+    private let keyFormat = AVAudioFormat(standardFormatWithSampleRate: KeystrokeSet.sampleRate, channels: 1)!
     private let ambientFormat = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 2)!
 
     private var players: [AVAudioPlayerNode] = []
     /// When each voice's current sound ends, in seconds since the reference date.
     private var busyUntil: [TimeInterval]
     private var sounds: [KeyClass: [AVAudioPCMBuffer]] = [:]
+    /// The keystroke set `sounds` holds.
+    private(set) var keystrokeSetID: String?
     private var lastVariant: [KeyClass: Int] = [:]
     private var ambientNode: AVAudioSourceNode?
-    /// The scene `ambientNode` is playing.
-    private var ambientChoice: AmbientChoice?
+    /// The ambience `ambientNode` is playing.
+    private var ambienceID: String?
     /// Fades in progress, one per node, so fading a new scene in never strands an old one.
     private var fades: [ObjectIdentifier: Timer] = [:]
     /// Nodes still fading out before they're detached.
@@ -46,8 +49,9 @@ public final class SoundEngine {
     public private(set) var isAvailable = true
 
     /// `offline` renders through `engine.renderOffline` instead of the speakers, for tests.
-    init(settings: WriterSettings, offline: Bool = false) {
+    init(settings: WriterSettings, library: Library = .shared, offline: Bool = false) {
         self.settings = settings
+        self.library = library
         self.offline = offline
         busyUntil = Array(repeating: 0, count: Self.voiceCount)
 
@@ -66,14 +70,14 @@ public final class SoundEngine {
             engine.connect(player, to: keysMixer, format: keyFormat)
             players.append(player)
         }
-        for kind in KeyClass.allCases {
-            sounds[kind] = MarimbaKeystrokes.sounds(for: kind).map(makeBuffer)
-        }
+        loadKeystrokes()
 
         NotificationCenter.default.addObserver(
             self, selector: #selector(configurationChanged), name: .AVAudioEngineConfigurationChange, object: engine)
         NotificationCenter.default.addObserver(
             self, selector: #selector(settingsChanged), name: WriterSettings.didChange, object: settings)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(settingsChanged), name: Library.didChange, object: library)
     }
 
     // MARK: Windows
@@ -89,6 +93,17 @@ public final class SoundEngine {
     }
 
     // MARK: Keystrokes
+
+    /// Renders the chosen keystroke set into buffers, unless they're already loaded.
+    private func loadKeystrokes() {
+        let set = library.keystrokeSet(for: settings.keystrokeChoice)
+        guard set.id != keystrokeSetID else { return }
+        keystrokeSetID = set.id
+        lastVariant = [:]
+        for kind in KeyClass.allCases {
+            sounds[kind] = set.sounds(kind).filter { !$0.isEmpty }.map(makeBuffer)
+        }
+    }
 
     public func keystroke(_ kind: KeyClass, isRepeat: Bool = false) {
         guard settings.keystrokeSounds, engine.isRunning, let variants = sounds[kind], !variants.isEmpty else { return }
@@ -122,11 +137,12 @@ public final class SoundEngine {
     /// Starts or stops the engine and the ambient scene to match the settings and open windows.
     private func update() {
         applyVolumes()
+        loadKeystrokes()
         if wanted, !engine.isRunning { start() }
         guard engine.isRunning else { return }
         if openWindows > 0, settings.ambientSound {
             // Choosing another scene crossfades: the old one fades out as the new one fades in.
-            if ambientChoice != settings.ambientChoice { stopAmbient() }
+            if ambienceID != library.ambience(for: settings.ambientChoice).id { stopAmbient() }
             startAmbient()
         } else {
             stopAmbient()
@@ -164,8 +180,8 @@ public final class SoundEngine {
 
     private func startAmbient() {
         guard ambientNode == nil else { return }
-        let choice = settings.ambientChoice
-        let scene = choice.makeScene(sampleRate: ambientFormat.sampleRate)
+        let ambience = library.ambience(for: settings.ambientChoice)
+        let scene = ambience.make(ambientFormat.sampleRate)
         let node = AVAudioSourceNode(format: ambientFormat) { _, _, frameCount, audioBufferList in
             let buffers = UnsafeMutableAudioBufferListPointer(audioBufferList)
             guard buffers.count >= 2,
@@ -178,14 +194,14 @@ public final class SoundEngine {
         engine.attach(node)
         engine.connect(node, to: ambientMixer, format: ambientFormat)
         ambientNode = node
-        ambientChoice = choice
+        ambienceID = ambience.id
         fade(node, to: 1, over: offline ? 0 : 2.5)
     }
 
     private func stopAmbient() {
         guard let node = ambientNode else { return }
         ambientNode = nil
-        ambientChoice = nil
+        ambienceID = nil
         fadingOut += 1
         fade(node, to: 0, over: offline ? 0 : 1.5) { [self] in
             engine.detach(node)

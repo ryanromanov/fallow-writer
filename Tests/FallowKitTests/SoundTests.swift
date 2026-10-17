@@ -249,7 +249,7 @@ func referenceLowField(sampleRate: Double, frames: Int) -> (left: [Float], right
         let sound = SoundEngine(settings: settings, offline: true)
         sound.windowOpened()
         let drone = try render(sound.engine, seconds: 0.5)
-        settings.ambientChoice = .wind
+        settings.ambientChoice = "wind"
         let wind = try render(sound.engine, seconds: 0.5)
         #expect(rms(drone) > 0.01)
         #expect(rms(wind) > 0.01)

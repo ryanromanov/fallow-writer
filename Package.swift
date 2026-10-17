@@ -6,6 +6,8 @@ let package = Package(
     platforms: [.macOS(.v13)],
     products: [
         .executable(name: "Fallow", targets: ["Fallow"]),
+        // For builds that add packs of their own on top of Fallow.
+        .library(name: "FallowKit", targets: ["FallowKit"]),
     ],
     targets: [
         // Everything but the entry point lives in FallowKit so tests can import it.

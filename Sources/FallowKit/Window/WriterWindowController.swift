@@ -43,7 +43,12 @@ final class WriterWindowController: NSWindowController, NSWindowDelegate, NSText
         sound?.windowOpened()
         NotificationCenter.default.addObserver(
             self, selector: #selector(settingsDidChange), name: WriterSettings.didChange, object: settings)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(libraryDidChange), name: Library.didChange, object: writerView.backgroundView.library)
     }
+
+    /// A pack was added or unlocked: Drift may have new scenes, or a saved choice may now show.
+    @objc private func libraryDidChange() { writerView.backgroundView.libraryChanged() }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }

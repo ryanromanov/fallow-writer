@@ -1,14 +1,18 @@
 import AppKit
 
 /// Builds the menus (Fallow has no nib) and handles the settings menu items.
-public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
+public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, NSMenuDelegate {
     private let settings: WriterSettings
+    private let library: Library
 
     /// True once Fallow itself has launched; false under `swift test`, so tests stay silent.
     static var isRunningApp = false
 
+    /// Fallow uses `Library.shared` throughout. A build that adds packs registers them, and
+    /// sets the library's access, before creating this.
     override public init() {
         settings = .shared
+        library = .shared
         super.init()
     }
 
@@ -47,20 +51,16 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
     @objc func toggleAnimatesTyping(_ sender: Any?) { settings.animatesTyping.toggle() }
 
     @objc func chooseScene(_ sender: NSMenuItem) {
-        if let raw = sender.representedObject as? String, let choice = SceneChoice(rawValue: raw) {
-            settings.sceneChoice = choice
-        }
+        if let id = sender.representedObject as? String { library.chooseScene(id, in: settings) }
     }
 
     @objc func chooseAmbient(_ sender: NSMenuItem) {
-        if let raw = sender.representedObject as? String, let choice = AmbientChoice(rawValue: raw) {
-            settings.ambientChoice = choice
-            settings.ambientSound = true
-        } else {
-            settings.ambientSound = false
-        }
+        library.chooseAmbience(sender.representedObject as? String, in: settings)
     }
-    @objc func toggleKeystrokeSounds(_ sender: Any?) { settings.keystrokeSounds.toggle() }
+
+    @objc func chooseKeystrokes(_ sender: NSMenuItem) {
+        library.chooseKeystrokes(sender.representedObject as? String, in: settings)
+    }
 
     public func validateMenuItem(_ item: NSMenuItem) -> Bool {
         switch item.action {
@@ -71,17 +71,18 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
         case #selector(toggleTypewriterScrolling):
             item.state = settings.typewriterScrolling ? .on : .off
         case #selector(chooseScene):
-            item.state = item.representedObject as? String == settings.sceneChoice.rawValue ? .on : .off
+            item.state = item.representedObject as? String == library.resolvedSceneID(settings.sceneChoice) ? .on : .off
         case #selector(toggleAnimatesTyping):
             item.state = settings.animatesTyping ? .on : .off
             // Reduce Motion wins; the setting is kept for when it's turned off again.
             return !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         case #selector(chooseAmbient):
-            let chosen = settings.ambientSound ? settings.ambientChoice.rawValue : nil
+            let chosen = settings.ambientSound ? library.ambience(for: settings.ambientChoice).id : nil
             item.state = item.representedObject as? String == chosen ? .on : .off
             return SoundEngine.shared.isAvailable
-        case #selector(toggleKeystrokeSounds):
-            item.state = settings.keystrokeSounds ? .on : .off
+        case #selector(chooseKeystrokes):
+            let chosen = settings.keystrokeSounds ? library.keystrokeSet(for: settings.keystrokeChoice).id : nil
+            item.state = item.representedObject as? String == chosen ? .on : .off
             return SoundEngine.shared.isAvailable
         case #selector(makeTextBigger):
             return settings.fontSize < WriterSettings.fontSizes.upperBound
@@ -218,13 +219,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
         let menu = NSMenu(title: "View")
         menu.addItem(item("Typewriter Scrolling", #selector(toggleTypewriterScrolling), "t", [.command, .option], target: self))
         menu.addItem(item("Animate Typing", #selector(toggleAnimatesTyping), target: self))
+        // Filled each time it opens, since packs can be added or unlocked while Fallow runs.
         let scenes = NSMenu(title: "Scene")
-        for choice in SceneChoice.allCases {
-            if choice == .drift { scenes.addItem(.separator()) }
-            let entry = item(choice.menuTitle, #selector(chooseScene), target: self)
-            entry.representedObject = choice.rawValue
-            scenes.addItem(entry)
-        }
+        scenes.delegate = self
+        menuNeedsUpdate(scenes)
         menu.addItem(submenu(scenes))
         menu.addItem(.separator())
         menu.addItem(item("Enter Full Screen", #selector(NSWindow.toggleFullScreen(_:)), "f", [.command, .control]))
@@ -232,25 +230,58 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
     }
 
     private func soundMenu() -> NSMenu {
+        // Filled each time it opens, like the Scene menu.
         let menu = NSMenu(title: "Sound")
-        let heading = NSMenuItem(title: "Ambient", action: nil, keyEquivalent: "")
+        menu.delegate = self
+        menuNeedsUpdate(menu)
+        return menu
+    }
+
+    public func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+        switch menu.title {
+        case "Scene":
+            for scene in library.scenes {
+                menu.addItem(choice(scene.title, scene.id, #selector(chooseScene)))
+            }
+            menu.addItem(.separator())
+            menu.addItem(choice("Drift (Chromotherapy)", Library.driftID, #selector(chooseScene)))
+        case "Sound":
+            heading("Ambient", in: menu)
+            for ambience in library.ambiences {
+                menu.addItem(choice(ambience.title, ambience.id, #selector(chooseAmbient), indented: true))
+            }
+            menu.addItem(choice("None", nil, #selector(chooseAmbient), indented: true))
+            menu.addItem(.separator())
+            heading("Keystrokes", in: menu)
+            for set in library.keystrokeSets {
+                menu.addItem(choice(set.title, set.id, #selector(chooseKeystrokes), indented: true))
+            }
+            menu.addItem(choice("None", nil, #selector(chooseKeystrokes), indented: true))
+            menu.addItem(.separator())
+            // Handled by the front window's controller, through the responder chain.
+            menu.addItem(item("Scene and Sound…", #selector(WriterWindowController.showAtmospherePanel)))
+        default:
+            break
+        }
+    }
+
+    private func heading(_ title: String, in menu: NSMenu) {
+        let heading = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         heading.isEnabled = false
         menu.addItem(heading)
-        for choice in AmbientChoice.allCases {
-            let entry = item(choice.title, #selector(chooseAmbient), target: self)
-            entry.representedObject = choice.rawValue
-            entry.indentationLevel = 1
-            menu.addItem(entry)
+    }
+
+    /// A menu item for a scene or sound. One from a locked pack shows a lock; choosing it asks
+    /// to unlock the pack.
+    private func choice(_ title: String, _ id: String?, _ action: Selector, indented: Bool = false) -> NSMenuItem {
+        let entry = item(title, action, target: self)
+        entry.representedObject = id
+        entry.indentationLevel = indented ? 1 : 0
+        if let id, !library.isAvailable(id) {
+            entry.image = NSImage(systemSymbolName: "lock", accessibilityDescription: "Locked")
         }
-        let none = item("None", #selector(chooseAmbient), target: self)
-        none.indentationLevel = 1
-        menu.addItem(none)
-        menu.addItem(.separator())
-        menu.addItem(item("Keystroke Sounds", #selector(toggleKeystrokeSounds), target: self))
-        menu.addItem(.separator())
-        // Handled by the front window's controller, through the responder chain.
-        menu.addItem(item("Scene and Sound…", #selector(WriterWindowController.showAtmospherePanel)))
-        return menu
+        return entry
     }
 
     private func windowMenu() -> NSMenu {

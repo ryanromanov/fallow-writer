@@ -109,15 +109,23 @@ public final class WriterSettings {
         set { set(min(max(newValue, 0), 1), for: "ambientVolume") }
     }
 
-    /// The scene behind the text, or Drift.
-    public var sceneChoice: SceneChoice {
-        get { defaults.string(forKey: "sceneChoice").flatMap(SceneChoice.init) ?? .paper }
-        set { set(newValue.rawValue, for: "sceneChoice") }
+    /// The scene behind the text, by id, or Drift (`Library.driftID`). The library falls back
+    /// to Paper if it's missing or locked.
+    public var sceneChoice: String {
+        get { defaults.string(forKey: "sceneChoice") ?? BuiltIn.paper.id }
+        set { set(newValue, for: "sceneChoice") }
     }
 
-    public var ambientChoice: AmbientChoice {
-        get { defaults.string(forKey: "ambientChoice").flatMap(AmbientChoice.init) ?? .lowField }
-        set { set(newValue.rawValue, for: "ambientChoice") }
+    /// The ambient sound, by id, played while `ambientSound` is on.
+    public var ambientChoice: String {
+        get { defaults.string(forKey: "ambientChoice") ?? BuiltIn.lowField.id }
+        set { set(newValue, for: "ambientChoice") }
+    }
+
+    /// The keystroke sounds, by id, played while `keystrokeSounds` is on.
+    public var keystrokeChoice: String {
+        get { defaults.string(forKey: "keystrokeChoice") ?? BuiltIn.marimba.id }
+        set { set(newValue, for: "keystrokeChoice") }
     }
 
     public var font: NSFont {
