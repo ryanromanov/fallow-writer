@@ -8,12 +8,15 @@ public struct Scenery {
     public let title: String
     public let light: ScenePalette
     public let dark: ScenePalette
+    /// Something moving over the colors, or nil for a still scene.
+    public let motion: SceneMotion?
 
-    public init(id: String, title: String, light: ScenePalette, dark: ScenePalette) {
+    public init(id: String, title: String, light: ScenePalette, dark: ScenePalette, motion: SceneMotion? = nil) {
         self.id = id
         self.title = title
         self.light = light
         self.dark = dark
+        self.motion = motion
     }
 
     public func palette(dark isDark: Bool) -> ScenePalette { isDark ? dark : light }

@@ -25,6 +25,27 @@ public struct ScenePalette: Equatable {
     var glowColors: [CGColor] { [Self.color(glow, alpha: glowAlpha), Self.color(glow, alpha: 0)] }
 }
 
+/// Something that moves over a scene's colors, such as drifting particles. Core Animation runs
+/// it in the render server, so it costs Fallow no CPU while it plays. Motion is left out when
+/// Reduce Motion is on, and removed while the window can't be seen.
+///
+/// Keep it slow and faint: it sits behind the text the whole time someone is writing.
+public protocol SceneMotion {
+    /// Makes the moving layer, for the light or the dark palette. It's made again whenever it
+    /// comes back into view, so it shouldn't depend on having run before.
+    func makeLayer(dark: Bool) -> CALayer
+    /// Fits the layer to the background whenever its size changes. By default, fills it.
+    func layout(_ layer: CALayer, in bounds: CGRect)
+    /// How long the motion seems to have been running already when it appears, so particles
+    /// are spread across the window instead of all starting at once.
+    var warmUp: CFTimeInterval { get }
+}
+
+extension SceneMotion {
+    public func layout(_ layer: CALayer, in bounds: CGRect) { layer.frame = bounds }
+    public var warmUp: CFTimeInterval { 0 }
+}
+
 /// Paints the chosen scene behind the text. Switching scenes crossfades; Drift is one long
 /// Core Animation loop that the render server runs on its own, so it costs no CPU here.
 final class BackgroundView: NSView {
@@ -38,11 +59,24 @@ final class BackgroundView: NSView {
         didSet { if choice != oldValue { repaint(animated: true) } }
     }
     var library = Library.shared
+    /// Whether to leave motion out. Replaced in tests.
+    var reducesMotion: () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+    /// Whether the window can be seen at all. Replaced in tests.
+    lazy var isOnScreen: () -> Bool = { [weak self] in self?.window?.occlusionState.contains(.visible) ?? false }
 
     private let wash = CAGradientLayer()
     private let glow = CAGradientLayer()
     /// What's painted now, so layout and redisplay don't restart a crossfade or Drift.
     private var painted: (choice: String, dark: Bool)?
+
+    /// A scene's motion, inside a holder layer that fades it with the scene. The holder stays while
+    /// the motion itself is taken out, when Reduce Motion is on or the window is hidden.
+    private struct Moving {
+        let holder: CALayer
+        let motion: SceneMotion
+        let dark: Bool
+    }
+    private var moving: [Moving] = []
 
     init() {
         super.init(frame: .zero)
@@ -52,12 +86,29 @@ final class BackgroundView: NSView {
         glow.endPoint = CGPoint(x: 1.25, y: 0.1)
         wash.locations = [0, 0.55, 1]
         wash.addSublayer(glow)
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(motionMayHaveChanged),
+            name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil)
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
+    deinit { NSWorkspace.shared.notificationCenter.removeObserver(self) }
+
     override func makeBackingLayer() -> CALayer { wash }
+
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        super.viewWillMove(toWindow: newWindow)
+        if let window {
+            NotificationCenter.default.removeObserver(self, name: NSWindow.didChangeOcclusionStateNotification, object: window)
+        }
+        if let newWindow {
+            NotificationCenter.default.addObserver(
+                self, selector: #selector(motionMayHaveChanged),
+                name: NSWindow.didChangeOcclusionStateNotification, object: newWindow)
+        }
+    }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
@@ -74,11 +125,17 @@ final class BackgroundView: NSView {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         glow.frame = wash.bounds
+        for item in moving {
+            item.holder.frame = wash.bounds
+            for layer in item.holder.sublayers ?? [] { item.motion.layout(layer, in: wash.bounds) }
+        }
         CATransaction.commit()
     }
 
     /// Whether Drift's loop is running, for tests.
     var isDrifting: Bool { wash.animation(forKey: "drift") != nil }
+    /// The motion layers playing now, for tests.
+    var motionLayers: [CALayer] { moving.flatMap { $0.holder.sublayers ?? [] } }
 
     /// Repaints after packs are added or unlocked, which can change what a choice shows.
     func libraryChanged() {
@@ -99,25 +156,89 @@ final class BackgroundView: NSView {
             layer.removeAnimation(forKey: "crossfade")
         }
 
-        let palettes = (library.scene(for: choice).map { [$0] } ?? library.driftScenes).map { $0.palette(dark: dark) }
+        let scenes = library.scene(for: choice).map { [$0] } ?? library.driftScenes
+        let palettes = scenes.map { $0.palette(dark: dark) }
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         wash.colors = palettes[0].washColors
         glow.colors = palettes[0].glowColors
         CATransaction.commit()
 
-        if animated, let fromWash, let fromGlow {
-            crossfade(wash, from: fromWash, to: palettes[0].washColors)
-            crossfade(glow, from: fromGlow, to: palettes[0].glowColors)
-        }
+        // Drift goes on first so the crossfade, added after it, shows over Drift's held start.
+        let delay = animated ? Self.crossfade : 0
         if palettes.count > 1 {
-            drift(wash, through: palettes.map(\.washColors), delay: animated ? Self.crossfade : 0)
-            drift(glow, through: palettes.map(\.glowColors), delay: animated ? Self.crossfade : 0)
+            let times = Self.driftTimes(count: palettes.count)
+            loop(wash, "colors", values: Self.driftValues(palettes.map(\.washColors)), times: times, delay: delay)
+            loop(glow, "colors", values: Self.driftValues(palettes.map(\.glowColors)), times: times, delay: delay)
         }
+        if animated, let fromWash, let fromGlow {
+            crossfade(wash, "colors", from: fromWash, to: palettes[0].washColors)
+            crossfade(glow, "colors", from: fromGlow, to: palettes[0].glowColors)
+        }
+        showMotion(of: scenes, dark: dark, animated: animated)
     }
 
-    private func crossfade(_ layer: CAGradientLayer, from: [Any], to: [CGColor]) {
-        let animation = CABasicAnimation(keyPath: "colors")
+    // MARK: Motion
+
+    /// Fades out the motion on screen and sets up each scene's own. In Drift, each scene's motion
+    /// fades in and out with its colors.
+    private func showMotion(of scenes: [Scenery], dark: Bool, animated: Bool) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        for item in moving { retire(item.holder, animated: animated) }
+        moving = []
+        for (index, scene) in scenes.enumerated() {
+            guard let motion = scene.motion else { continue }
+            let holder = CALayer()
+            holder.frame = wash.bounds
+            holder.opacity = index == 0 ? 1 : 0
+            wash.addSublayer(holder)
+            if scenes.count > 1 {
+                let (values, times) = Self.driftOpacity(index: index, count: scenes.count)
+                loop(holder, "opacity", values: values, times: times, delay: animated ? Self.crossfade : 0)
+            }
+            if animated, index == 0 { crossfade(holder, "opacity", from: 0, to: 1) }
+            moving.append(Moving(holder: holder, motion: motion, dark: dark))
+        }
+        CATransaction.commit()
+        motionMayHaveChanged()
+    }
+
+    /// Puts motion in while it can be seen and Reduce Motion is off, and takes it out otherwise.
+    @objc func motionMayHaveChanged() {
+        let allowed = !reducesMotion() && isOnScreen()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        for item in moving {
+            let playing = !(item.holder.sublayers ?? []).isEmpty
+            if allowed, !playing {
+                let layer = item.motion.makeLayer(dark: item.dark)
+                item.motion.layout(layer, in: item.holder.bounds)
+                layer.beginTime = item.holder.convertTime(CACurrentMediaTime(), from: nil) - item.motion.warmUp
+                item.holder.addSublayer(layer)
+            } else if !allowed, playing {
+                item.holder.sublayers?.forEach { $0.removeFromSuperlayer() }
+            }
+        }
+        CATransaction.commit()
+    }
+
+    /// Fades a scene's motion away and then removes it.
+    private func retire(_ holder: CALayer, animated: Bool) {
+        let from = holder.presentation()?.opacity ?? holder.opacity
+        holder.removeAllAnimations()
+        holder.opacity = 0
+        guard animated, from > 0 else { return holder.removeFromSuperlayer() }
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { holder.removeFromSuperlayer() }
+        crossfade(holder, "opacity", from: from, to: 0)
+        CATransaction.commit()
+    }
+
+    // MARK: Animations
+
+    private func crossfade(_ layer: CALayer, _ keyPath: String, from: Any, to: Any) {
+        let animation = CABasicAnimation(keyPath: keyPath)
         animation.fromValue = from
         animation.toValue = to
         animation.duration = Self.crossfade
@@ -125,26 +246,39 @@ final class BackgroundView: NSView {
         layer.add(animation, forKey: "crossfade")
     }
 
-    /// Holds each palette, then eases to the next, and loops back to the first.
-    private func drift(_ layer: CAGradientLayer, through palettes: [[CGColor]], delay: CFTimeInterval) {
-        let step = Self.driftHold + Self.driftMove
-        let total = step * Double(palettes.count)
-        var values: [[CGColor]] = [], times: [NSNumber] = []
-        for (index, colors) in palettes.enumerated() {
-            values += [colors, colors]
-            times += [NSNumber(value: Double(index) * step / total), NSNumber(value: (Double(index) * step + Self.driftHold) / total)]
-        }
-        values.append(palettes[0])
-        times.append(1)
-        let animation = CAKeyframeAnimation(keyPath: "colors")
+    /// One endless Drift loop, through every scene and back to the first.
+    private func loop(_ layer: CALayer, _ keyPath: String, values: [Any], times: [NSNumber], delay: CFTimeInterval) {
+        let animation = CAKeyframeAnimation(keyPath: keyPath)
         animation.values = values
         animation.keyTimes = times
-        animation.duration = total
+        animation.duration = (Self.driftHold + Self.driftMove) * Double(times.count - 1) / 2
         animation.repeatCount = .infinity
         animation.calculationMode = .linear
         animation.beginTime = layer.convertTime(CACurrentMediaTime(), from: nil) + delay
         animation.fillMode = .backwards
         animation.isRemovedOnCompletion = false
         layer.add(animation, forKey: "drift")
+    }
+
+    /// Drift's key times: each scene is held, then eased into the next, and the last returns to the first.
+    static func driftTimes(count: Int) -> [NSNumber] {
+        let step = driftHold + driftMove, total = step * Double(count)
+        var times: [NSNumber] = []
+        for index in 0..<count {
+            times += [NSNumber(value: Double(index) * step / total), NSNumber(value: (Double(index) * step + driftHold) / total)]
+        }
+        return times + [1]
+    }
+
+    /// Each value held, then the first again at the end, to go with `driftTimes`.
+    static func driftValues(_ values: [Any]) -> [Any] {
+        values.flatMap { [$0, $0] } + [values[0]]
+    }
+
+    /// One scene's motion in Drift: fully there while its colors are held, fading in and out
+    /// while they move.
+    static func driftOpacity(index: Int, count: Int) -> (values: [Any], times: [NSNumber]) {
+        let values: [Float] = (0..<count).flatMap { $0 == index ? [1, 1] : [0, 0] as [Float] } + [index == 0 ? 1 : 0]
+        return (values, driftTimes(count: count))
     }
 }

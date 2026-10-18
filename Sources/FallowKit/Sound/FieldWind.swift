@@ -14,39 +14,11 @@ final class FieldWind: AmbientScene {
     /// Overall level, set so the wind sits at the same loudness as Low Field.
     static let level = 0.36
 
-    /// A state-variable filter (Zavalishin's topology-preserving form), stable while its
-    /// frequency moves, which plain biquads aren't.
-    struct Filter {
-        private var g = 0.0, k = 1.0, a1 = 0.0, a2 = 0.0, a3 = 0.0
-        private var ic1 = 0.0, ic2 = 0.0
-
-        mutating func tune(frequency: Double, q: Double, sampleRate: Double) {
-            g = tan(Double.pi * min(frequency, sampleRate * 0.45) / sampleRate)
-            k = 1 / q
-            a1 = 1 / (1 + g * (g + k))
-            a2 = g * a1
-            a3 = g * a2
-        }
-
-        /// Returns (low-pass, band-pass, high-pass).
-        mutating func process(_ x: Double) -> (low: Double, band: Double, high: Double) {
-            let v3 = x - ic2
-            let v1 = a1 * ic1 + a2 * v3
-            let v2 = ic2 + a2 * ic1 + a3 * v3
-            ic1 = 2 * v1 - ic1
-            ic2 = 2 * v2 - ic2
-            // Keep denormals out of the integrators.
-            if abs(ic1) < 1e-20 { ic1 = 0 }
-            if abs(ic2) < 1e-20 { ic2 = 0 }
-            return (v2, v1, x - k * v1 - v2)
-        }
-    }
-
     /// One ear's noise and filters.
     struct Channel {
         var random: FastRandom
         var brown = 0.0
-        var body = Filter(), whoosh = Filter(), rustle = Filter(), whistle = Filter()
+        var body = StateVariableFilter(), whoosh = StateVariableFilter(), rustle = StateVariableFilter(), whistle = StateVariableFilter()
         var flutter = 0.0              // fast random flicker for the grass
         /// This ear's filters sit a little apart from the other's.
         let offset: Double
