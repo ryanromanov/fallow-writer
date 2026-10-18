@@ -9,8 +9,6 @@ A quiet place to write. Fallow is a native macOS app for distraction-free writin
   <img alt="Fallow's writing window: three short paragraphs in a serif typeface on a warm, paper-colored background, with the document name and word count faint at the bottom." src="docs/images/writing-light.png">
 </picture>
 
-It's named after fallow ground, a field left to rest before it's planted again.
-
 ## Install
 With [Homebrew](https://brew.sh):
 
