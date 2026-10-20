@@ -30,25 +30,6 @@ public enum KeyClass: CaseIterable {
     }
 }
 
-/// A small, fast random number generator (xorshift64*), safe to use on the audio thread.
-struct FastRandom {
-    private var state: UInt64
-
-    init(seed: UInt64) { state = seed == 0 ? 0x9E37_79B9_7F4A_7C15 : seed }
-
-    mutating func next() -> UInt64 {
-        state ^= state >> 12
-        state ^= state << 25
-        state ^= state >> 27
-        return state &* 0x2545_F491_4F6C_DD1D
-    }
-
-    /// Uniform in -1...1.
-    mutating func bipolar() -> Float {
-        Float(Double(next() >> 11) / Double(1 << 53)) * 2 - 1
-    }
-}
-
 /// "Marimba": soft wooden bars struck with a felt mallet. Letters play notes of a D major
 /// pentatonic scale, so any run of typing sounds consonant.
 enum MarimbaKeystrokes {

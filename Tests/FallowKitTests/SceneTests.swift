@@ -2,6 +2,16 @@ import AppKit
 import Testing
 @testable import FallowKit
 
+/// A motion that makes a plain, named layer.
+struct TestMotion: SceneMotion {
+    var warmUp: CFTimeInterval { 20 }
+    func makeLayer(dark: Bool) -> CALayer {
+        let layer = CALayer()
+        layer.name = dark ? "dark" : "light"
+        return layer
+    }
+}
+
 @Suite @MainActor struct SceneTests {
     /// WCAG relative luminance of an sRGB color.
     func luminance(_ color: CGColor) -> Double {
@@ -62,5 +72,81 @@ import Testing
         panel.sceneChoices.buttons.first { $0.title == "Mist" }!.performClick(nil)
         #expect(settings.sceneChoice == "mist")
         #expect(panel.sceneChoices.buttons.filter(\.isChosen).map(\.title) == ["Mist"])
+    }
+
+    // MARK: Motion
+
+    static let moving = Scenery(id: "moving", title: "Moving", light: BuiltIn.mist.light, dark: BuiltIn.mist.dark, motion: TestMotion())
+
+    func motionView() -> (BackgroundView, NSWindow) {
+        _ = NSApplication.shared
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 200, height: 200), styleMask: [.titled], backing: .buffered, defer: false)
+        let library = Library()
+        library.register(Pack(id: "extra", title: "Extra", scenes: [Self.moving]))
+        let view = BackgroundView()
+        view.library = library
+        view.isOnScreen = { true }
+        view.reducesMotion = { false }
+        view.frame = window.contentView!.bounds
+        window.contentView!.addSubview(view)
+        return (view, window)
+    }
+
+    @Test func motionPlaysOnlyForItsScene() {
+        let (view, _) = motionView()
+        #expect(view.motionLayers.isEmpty)
+        view.choice = "moving"
+        #expect(view.motionLayers.count == 1)
+        let layer = view.motionLayers[0]
+        // Started as if it had already been running for its warm-up.
+        #expect(layer.beginTime < layer.superlayer!.convertTime(CACurrentMediaTime(), from: nil) - 19)
+        #expect(layer.frame == view.bounds)
+        view.choice = "paper"
+        #expect(view.motionLayers.isEmpty)
+    }
+
+    @Test func motionLeavesWithReduceMotionAndWhileHidden() {
+        let (view, _) = motionView()
+        view.choice = "moving"
+        var reduce = true
+        view.reducesMotion = { reduce }
+        NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil)
+        #expect(view.motionLayers.isEmpty)
+        reduce = false
+        view.motionMayHaveChanged()
+        #expect(view.motionLayers.count == 1)
+
+        var visible = false
+        view.isOnScreen = { visible }
+        NotificationCenter.default.post(name: NSWindow.didChangeOcclusionStateNotification, object: view.window)
+        #expect(view.motionLayers.isEmpty)
+        visible = true
+        view.motionMayHaveChanged()
+        #expect(view.motionLayers.count == 1)
+    }
+
+    @Test func motionFollowsAppearanceAndJoinsDrift() {
+        let (view, _) = motionView()
+        view.appearance = NSAppearance(named: .aqua)
+        view.choice = "moving"
+        #expect(view.motionLayers.map(\.name) == ["light"])
+        view.appearance = NSAppearance(named: .darkAqua)
+        #expect(view.motionLayers.map(\.name) == ["dark"])
+
+        view.choice = Library.driftID
+        #expect(view.isDrifting && view.motionLayers.count == 1)
+        let holder = view.motionLayers[0].superlayer!
+        #expect(holder.animation(forKey: "drift") != nil)
+    }
+
+    /// In Drift, a scene's motion is there exactly while its colors are.
+    @Test func driftOpacityFollowsTheColors() {
+        let times = BackgroundView.driftTimes(count: 3).map(\.doubleValue)
+        let expected: [Double] = (0...6).map { Double($0) / 6 }
+        #expect(zip(times, expected).allSatisfy { abs($0 - $1) < 1e-12 } && times.count == 7)
+        let first = BackgroundView.driftOpacity(index: 0, count: 3).values as! [Float]
+        let last = BackgroundView.driftOpacity(index: 2, count: 3).values as! [Float]
+        #expect(first == [1, 1, 0, 0, 0, 0, 1])
+        #expect(last == [0, 0, 0, 0, 1, 1, 0])
     }
 }
