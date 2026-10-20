@@ -21,6 +21,32 @@ import Testing
         row.buttons.filter(\.isChosen).map(\.title)
     }
 
+    /// A row too long for the panel wraps between words: no line runs past the panel's width,
+    /// nothing overlaps, and a dot sits between neighbors on a line but never at a break.
+    @Test func longRowsWrap() {
+        let (panel, settings) = makePanel()
+        let row = ChoiceRow(settings: settings, label: "Test")
+        row.options = ["Paper", "Dusk", "Mist", "Meadow", "Sample One", "Sample Two", "Sample Three", "Sample Four", "Drift"]
+            .map { ChoiceRow.Option(title: $0, id: $0.lowercased()) }
+        row.selected = "paper"
+        let size = row.intrinsicContentSize
+        row.frame = NSRect(origin: .zero, size: size)
+        row.layoutSubtreeIfNeeded()
+        let dots = row.subviews.filter { !($0 is ChoiceButton) }
+        #expect(size.width <= ChoiceRow.maxWidth)
+        #expect(Set(row.buttons.map(\.frame.minY)).count > 1)
+        for (index, dot) in dots.enumerated() {
+            let before = row.buttons[index].frame, after = row.buttons[index + 1].frame
+            if before.minY == after.minY {
+                #expect(!dot.isHidden && dot.frame.width >= dot.fittingSize.width)
+                #expect(before.maxX <= dot.frame.minX && dot.frame.maxX <= after.minX)
+            } else {
+                #expect(dot.isHidden && after.minX == 0)
+            }
+        }
+        _ = panel
+    }
+
     @Test func choicesAndVolumesReachSettings() {
         let (panel, settings) = makePanel()
         click(panel.ambientChoices, "Wind")

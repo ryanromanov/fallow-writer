@@ -157,8 +157,10 @@ final class AtmospherePanel: NSViewController {
 }
 
 /// Choices set as words in a line, "Low Field · Wind · Off": the chosen one in full ink, the
-/// rest faded. Each word is a real button that VoiceOver reads as a radio button.
-final class ChoiceRow: NSStackView {
+/// rest faded. Each word is a real button that VoiceOver reads as a radio button. A row too long
+/// for the panel wraps onto further lines, breaking between words, never mid-name, and the dot
+/// at a break is left out.
+final class ChoiceRow: NSView {
     struct Option {
         let title: String
         /// Nil for "Off".
@@ -169,10 +171,16 @@ final class ChoiceRow: NSStackView {
         static let off = Option(title: "Off", id: nil)
     }
 
+    /// The widest a line of choices gets before wrapping, in points.
+    static let maxWidth: CGFloat = 300
+    /// Space between a word and a dot, and between lines.
+    static let spacing: CGFloat = 7, lineSpacing: CGFloat = 2
+
     /// Called with the chosen option's id, or nil for "Off".
     var onChoose: ((String?) -> Void)?
     private(set) var buttons: [ChoiceButton] = []
     private let settings: WriterSettings
+    /// The dot before each button but the first.
     private var dots: [NSTextField] = []
 
     var options: [Option] = [] {
@@ -187,7 +195,7 @@ final class ChoiceRow: NSStackView {
     init(settings: WriterSettings, label: String) {
         self.settings = settings
         super.init(frame: .zero)
-        spacing = 7
+        setAccessibilityElement(true)
         setAccessibilityRole(.radioGroup)
         setAccessibilityLabel(label)
     }
@@ -195,23 +203,25 @@ final class ChoiceRow: NSStackView {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
+    override var isFlipped: Bool { true }
+
     private func rebuild() {
-        for view in arrangedSubviews { view.removeFromSuperview() }
+        for view in subviews { view.removeFromSuperview() }
         buttons = []
         dots = []
         for (index, option) in options.enumerated() {
             if index > 0 {
                 let dot = NSTextField(labelWithString: "·")
                 dot.textColor = Palette.secondary
-                dots.append(dot)
                 dot.setAccessibilityElement(false)
-                addArrangedSubview(dot)
+                dots.append(dot)
+                addSubview(dot)
             }
             let button = ChoiceButton(title: option.title, target: self, action: #selector(chose))
             button.tag = index
             button.isLocked = option.isLocked
             buttons.append(button)
-            addArrangedSubview(button)
+            addSubview(button)
         }
         restyle()
     }
@@ -229,6 +239,56 @@ final class ChoiceRow: NSStackView {
         for (index, button) in buttons.enumerated() {
             button.font = font
             button.isChosen = options[index].id == selected
+        }
+        invalidateIntrinsicContentSize()
+        needsLayout = true
+    }
+
+    // MARK: Layout
+
+    /// Where each word goes, where each dot goes (nil where a line breaks), and the size of it all.
+    private func arrangement() -> (buttons: [NSRect], dots: [NSRect?], size: NSSize) {
+        var buttonFrames: [NSRect] = [], dotFrames: [NSRect?] = []
+        var x: CGFloat = 0, y: CGFloat = 0, lineHeight: CGFloat = 0, width: CGFloat = 0
+        for (index, button) in buttons.enumerated() {
+            let size = button.intrinsicContentSize
+            if index > 0 {
+                // A label's fitting size includes its padding; its intrinsic size can leave the dot clipped.
+                let dot = dots[index - 1].fittingSize
+                let needed = Self.spacing + dot.width + Self.spacing + size.width
+                if x + needed <= Self.maxWidth {
+                    dotFrames.append(NSRect(x: x + Self.spacing, y: y, width: dot.width, height: dot.height))
+                    x += Self.spacing + dot.width + Self.spacing
+                } else {
+                    dotFrames.append(nil)
+                    y += lineHeight + Self.lineSpacing
+                    x = 0
+                    lineHeight = 0
+                }
+            }
+            buttonFrames.append(NSRect(x: x, y: y, width: size.width, height: size.height))
+            x += size.width
+            width = max(width, x)
+            lineHeight = max(lineHeight, size.height)
+        }
+        // Center each dot on its line's words.
+        dotFrames = dotFrames.enumerated().map { index, frame in
+            guard var frame else { return nil }
+            frame.origin.y = buttonFrames[index + 1].midY - frame.height / 2
+            return frame
+        }
+        return (buttonFrames, dotFrames, NSSize(width: width, height: buttons.isEmpty ? 0 : y + lineHeight))
+    }
+
+    override var intrinsicContentSize: NSSize { arrangement().size }
+
+    override func layout() {
+        super.layout()
+        let (buttonFrames, dotFrames, _) = arrangement()
+        for (button, frame) in zip(buttons, buttonFrames) { button.frame = frame }
+        for (dot, frame) in zip(dots, dotFrames) {
+            dot.isHidden = frame == nil
+            if let frame { dot.frame = frame }
         }
     }
 }
