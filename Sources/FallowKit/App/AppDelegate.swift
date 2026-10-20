@@ -10,11 +10,18 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
 
     /// Fallow uses `Library.shared` throughout. A build that adds packs registers them, and
     /// sets the library's access, before creating this.
-    override public init() {
-        settings = .shared
-        library = .shared
+    override public convenience init() {
+        self.init(settings: .shared, library: .shared)
+    }
+
+    init(settings: WriterSettings, library: Library) {
+        self.settings = settings
+        self.library = library
         super.init()
     }
+
+    /// Where Help › Fallow Help goes: the project page, which describes every feature.
+    static let helpURL = URL(string: "https://github.com/ryanromanov/fallow-writer#readme")!
 
     public func applicationWillFinishLaunching(_ notification: Notification) {
         // Create the shared document controller before anything else asks for one.
@@ -36,6 +43,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
     }
 
     @objc func makeTextBigger(_ sender: Any?) { settings.fontSize += 1 }
+    @objc func showHelp(_ sender: Any?) { NSWorkspace.shared.open(Self.helpURL) }
     @objc func makeTextSmaller(_ sender: Any?) { settings.fontSize -= 1 }
 
     @objc func chooseLineSpacing(_ sender: NSMenuItem) {
@@ -85,6 +93,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
             item.state = item.representedObject as? String == chosen ? .on : .off
             return SoundEngine.shared.isAvailable
         case #selector(makeTextBigger):
+            // Also the hidden ⌘= item.
             return settings.fontSize < WriterSettings.fontSizes.upperBound
         case #selector(makeTextSmaller):
             return settings.fontSize > WriterSettings.fontSizes.lowerBound
@@ -96,7 +105,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
 
     // MARK: Menus
 
-    private func makeMainMenu() -> NSMenu {
+    func makeMainMenu() -> NSMenu {
         let main = NSMenu()
         main.addItem(submenu(appMenu()))
         main.addItem(submenu(fileMenu()))
@@ -107,6 +116,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
         let window = windowMenu()
         main.addItem(submenu(window))
         NSApp.windowsMenu = window
+        let help = helpMenu()
+        main.addItem(submenu(help))
+        // Gives the menu its search field, which finds any menu item by name.
+        NSApp.helpMenu = help
         return main
     }
 
@@ -203,6 +216,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
         }
         menu.addItem(submenu(font))
         menu.addItem(item("Bigger", #selector(makeTextBigger), "+", target: self))
+        // ⌘+ is really ⌘⇧= on most keyboards, so ⌘= works too, as in TextEdit.
+        let equals = item("Bigger", #selector(makeTextBigger), "=", target: self)
+        equals.isHidden = true
+        equals.allowsKeyEquivalentWhenHidden = true
+        menu.addItem(equals)
         menu.addItem(item("Smaller", #selector(makeTextSmaller), "-", target: self))
         menu.addItem(.separator())
         let spacing = NSMenu(title: "Line Spacing")
@@ -241,8 +259,16 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
         menu.removeAllItems()
         switch menu.title {
         case "Scene":
-            for scene in library.scenes {
-                menu.addItem(choice(scene.title, scene.id, #selector(chooseScene)))
+            // Grouped under each pack's name once there's more than Fallow's own.
+            let packs = library.packs.filter { !$0.scenes.isEmpty }
+            for pack in packs {
+                if packs.count > 1 {
+                    if pack.id != packs.first?.id { menu.addItem(.separator()) }
+                    heading(pack.title, in: menu)
+                }
+                for scene in pack.scenes {
+                    menu.addItem(choice(scene.title, scene.id, #selector(chooseScene), indented: packs.count > 1))
+                }
             }
             menu.addItem(.separator())
             menu.addItem(choice("Drift (Chromotherapy)", Library.driftID, #selector(chooseScene)))
@@ -251,16 +277,16 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
             for ambience in library.ambiences {
                 menu.addItem(choice(ambience.title, ambience.id, #selector(chooseAmbient), indented: true))
             }
-            menu.addItem(choice("None", nil, #selector(chooseAmbient), indented: true))
+            menu.addItem(choice("Off", nil, #selector(chooseAmbient), indented: true))
             menu.addItem(.separator())
             heading("Keystrokes", in: menu)
             for set in library.keystrokeSets {
                 menu.addItem(choice(set.title, set.id, #selector(chooseKeystrokes), indented: true))
             }
-            menu.addItem(choice("None", nil, #selector(chooseKeystrokes), indented: true))
+            menu.addItem(choice("Off", nil, #selector(chooseKeystrokes), indented: true))
             menu.addItem(.separator())
             // Handled by the front window's controller, through the responder chain.
-            menu.addItem(item("Scene and Sound…", #selector(WriterWindowController.showAtmospherePanel)))
+            menu.addItem(item("Scene and Sound…", #selector(WriterWindowController.showAtmospherePanel), "s", [.command, .control]))
         default:
             break
         }
@@ -290,6 +316,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
         menu.addItem(item("Zoom", #selector(NSWindow.performZoom(_:))))
         menu.addItem(.separator())
         menu.addItem(item("Bring All to Front", #selector(NSApplication.arrangeInFront(_:))))
+        return menu
+    }
+
+    private func helpMenu() -> NSMenu {
+        let menu = NSMenu(title: "Help")
+        menu.addItem(item("Fallow Help", #selector(showHelp), "?", target: self))
         return menu
     }
 
