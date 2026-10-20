@@ -221,7 +221,7 @@ public final class SoundEngine {
         }
         if target > 0 { node.volume = 0 }
         let start = node.volume, began = Date()
-        fades[id] = Timer.scheduledTimer(withTimeInterval: 1.0 / 30, repeats: true) { [weak self] timer in
+        let timer = Timer(timeInterval: 1.0 / 30, repeats: true) { [weak self] timer in
             let progress = min(1, Float(Date().timeIntervalSince(began) / duration))
             // Ease in and out so the start and end of the fade are both gentle.
             let eased = progress * progress * (3 - 2 * progress)
@@ -231,6 +231,10 @@ public final class SoundEngine {
             self?.fades.removeValue(forKey: id)
             done?()
         }
+        // In common modes, so a fade keeps going while a slider is dragged, a menu is open or
+        // the window is resized, instead of pausing part-way until the mouse is let go.
+        RunLoop.main.add(timer, forMode: .common)
+        fades[id] = timer
     }
 
     private func makeBuffer(_ samples: [Float]) -> AVAudioPCMBuffer {

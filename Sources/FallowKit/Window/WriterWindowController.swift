@@ -85,7 +85,7 @@ final class WriterWindowController: NSWindowController, NSWindowDelegate, NSText
         updateStatus()
     }
 
-    /// Shows the sound panel under the speaker button. Also the Sound › Volume… menu item.
+    /// Shows the sound panel under the speaker button. Also the Sound › Scene and Sound… menu item.
     @objc func showAtmospherePanel(_ sender: Any?) {
         if let popover = soundPopover, popover.isShown {
             popover.performClose(sender)
