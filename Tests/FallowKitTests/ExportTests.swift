@@ -30,10 +30,27 @@ import Testing
     }
 
     @Test func plainTextExportsAsTyped() {
-        let text = exporter().typeset("# Not a heading\n\n**still plain**", markdown: false)
-        #expect(text.string == "# Not a heading\n\n**still plain**")
-        #expect(font(text, at: "still").pointSize == Exporter.bodySize)
+        let text = exporter().typeset("# Not a heading\n\n- nor a list", markdown: false)
+        #expect(text.string == "# Not a heading\n\n- nor a list")
+        #expect(font(text, at: "nor").pointSize == Exporter.bodySize)
         #expect((text.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor) == .black)
+    }
+
+    /// Format › Font's bold and italic marks become real bold and italics in plain text too.
+    @Test func plainTextKeepsItsBoldAndItalics() {
+        let text = exporter().typeset("A **bold** word, an *italic* one, ***both*** at once.", markdown: false)
+        #expect(text.string == "A bold word, an italic one, both at once.")
+        func traits(_ word: String) -> NSFontDescriptor.SymbolicTraits { font(text, at: word).fontDescriptor.symbolicTraits }
+        #expect(traits("bold").contains(.bold) && !traits("bold").contains(.italic))
+        #expect(traits("italic").contains(.italic) && !traits("italic").contains(.bold))
+        #expect(traits("both").contains(.bold) && traits("both").contains(.italic))
+        #expect(!traits("word").contains(.bold) && !traits("word").contains(.italic))
+    }
+
+    @Test func plainTextLeavesOtherAsterisksAlone() {
+        for typed in ["2*3*4 = 24", "a * b * c", "**not closed", "*\nacross lines*", "file_*name*.txt"] {
+            #expect(exporter().typeset(typed, markdown: false).string == typed)
+        }
     }
 
     @Test func markdownBecomesFormatting() {

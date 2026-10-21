@@ -2,8 +2,9 @@ import AppKit
 
 /// Typesets a document for paper (PDF, printing, Rich Text and Word): the writing font's family
 /// at a print size, in black, with the writer's line spacing. Markdown documents come out
-/// formatted, so `# Heading`, `**bold**` and lists become real headings, bold and lists;
-/// plain text comes out exactly as typed.
+/// formatted, so `# Heading`, `**bold**` and lists become real headings, bold and lists.
+/// Plain text comes out as typed, except that the bold and italic marks Format › Font writes
+/// become real bold and italics.
 struct Exporter {
     static let bodySize: CGFloat = 12
     /// A US Letter or A4 page's text column, at 72 points per inch with one-inch margins.
@@ -12,7 +13,7 @@ struct Exporter {
     let settings: WriterSettings
 
     func typeset(_ text: String, markdown: Bool) -> NSAttributedString {
-        markdown ? formatted(markdown: text) : NSAttributedString(string: text, attributes: body())
+        markdown ? formatted(markdown: text) : emphasized(plain: text)
     }
 
     // MARK: Type
@@ -20,7 +21,8 @@ struct Exporter {
     private func font(size: CGFloat = bodySize, bold: Bool = false, italic: Bool = false, mono: Bool = false) -> NSFont {
         let base = NSFont.systemFont(ofSize: size, weight: bold ? .bold : .regular).fontDescriptor
         var descriptor = base.withDesign(mono ? .monospaced : settings.fontStyle.design) ?? base
-        if italic { descriptor = descriptor.withSymbolicTraits(.italic) }
+        // Added to the traits it has, so bold italic stays bold.
+        if italic { descriptor = descriptor.withSymbolicTraits(descriptor.symbolicTraits.union(.italic)) }
         return NSFont(descriptor: descriptor, size: size) ?? .systemFont(ofSize: size)
     }
 
@@ -39,6 +41,26 @@ struct Exporter {
 
     private func body() -> [NSAttributedString.Key: Any] {
         [.font: font(), .foregroundColor: NSColor.black, .paragraphStyle: paragraph()]
+    }
+
+    // MARK: Plain text
+
+    /// `*italic*`, `**bold**` and `***both***` within a line. A mark has to touch its words on the
+    /// inside and not be part of a word on the outside, so `2*3*4` and `a * b` stay as typed.
+    private static let emphasis = try! NSRegularExpression(
+        pattern: #"(?<![*\w])(\*{1,3})([^\s*]|[^\s*][^\n]*?[^\s*])\1(?![*\w])"#)
+
+    private func emphasized(plain text: String) -> NSAttributedString {
+        let output = NSMutableAttributedString(string: text, attributes: body())
+        let matches = Self.emphasis.matches(in: text, range: NSRange(location: 0, length: output.length))
+        // From the end, so removing marks doesn't move the matches still to come.
+        for match in matches.reversed() {
+            let marks = match.range(at: 1).length
+            output.addAttribute(.font, value: font(bold: marks >= 2, italic: marks != 2), range: match.range(at: 2))
+            output.deleteCharacters(in: NSRange(location: NSMaxRange(match.range(at: 2)), length: marks))
+            output.deleteCharacters(in: match.range(at: 1))
+        }
+        return output
     }
 
     // MARK: Markdown
