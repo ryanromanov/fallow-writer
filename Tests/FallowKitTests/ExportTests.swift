@@ -47,8 +47,17 @@ import Testing
         #expect(!traits("word").contains(.bold) && !traits("word").contains(.italic))
     }
 
+    /// ⌘I on part of a word puts the marks inside it.
+    @Test func plainTextMarksCanBeInsideWords() {
+        let text = exporter().typeset("un*believ*able and half**way**", markdown: false)
+        #expect(text.string == "unbelievable and halfway")
+        #expect(font(text, at: "believ").fontDescriptor.symbolicTraits.contains(.italic))
+        #expect(font(text, at: "way").fontDescriptor.symbolicTraits.contains(.bold))
+        #expect(!font(text, at: "un").fontDescriptor.symbolicTraits.contains(.italic))
+    }
+
     @Test func plainTextLeavesOtherAsterisksAlone() {
-        for typed in ["2*3*4 = 24", "a * b * c", "**not closed", "*\nacross lines*", "file_*name*.txt"] {
+        for typed in ["2*3*4 = 24", "a * b * c", "**not closed", "*\nacross lines*"] {
             #expect(exporter().typeset(typed, markdown: false).string == typed)
         }
     }
@@ -83,11 +92,10 @@ import Testing
         #expect(font(back, at: "bold").fontDescriptor.symbolicTraits.contains(.bold))
     }
 
-    @Test func pdfHasPagesOfText() throws {
+    func pages(_ typed: String) throws -> Int {
         _ = NSApplication.shared
         let exporter = exporter()
-        let long = String(repeating: "A field left to rest is not an empty field. ", count: 400)
-        let text = exporter.typeset(long, markdown: false)
+        let text = exporter.typeset(typed, markdown: false)
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("fallow-\(UUID().uuidString).pdf")
         defer { try? FileManager.default.removeItem(at: url) }
         let info = NSPrintInfo.shared.copy() as! NSPrintInfo
@@ -97,8 +105,16 @@ import Testing
         operation.showsPrintPanel = false
         operation.showsProgressPanel = false
         #expect(operation.run())
-        let pdf = try #require(CGPDFDocument(url as CFURL))
-        #expect(pdf.numberOfPages >= 2)
+        return try #require(CGPDFDocument(url as CFURL)).numberOfPages
+    }
+
+    @Test func pdfHasPagesOfText() throws {
+        #expect(try pages(String(repeating: "A field left to rest is not an empty field. ", count: 400)) >= 2)
+    }
+
+    /// It once printed a blank page after any text shorter than a page.
+    @Test func shortTextIsOnePage() throws {
+        #expect(try pages("A few words.") == 1)
     }
 
     @Test func documentKnowsItsKind() throws {

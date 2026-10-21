@@ -45,10 +45,11 @@ struct Exporter {
 
     // MARK: Plain text
 
-    /// `*italic*`, `**bold**` and `***both***` within a line. A mark has to touch its words on the
-    /// inside and not be part of a word on the outside, so `2*3*4` and `a * b` stay as typed.
+    /// `*italic*`, `**bold**` and `***both***` within a line, inside a word too, as Format › Font
+    /// writes them for part of a word. A mark has to touch its words on the inside, and numbers
+    /// don't count, so `a * b` and `2*3*4` stay as typed.
     private static let emphasis = try! NSRegularExpression(
-        pattern: #"(?<![*\w])(\*{1,3})([^\s*]|[^\s*][^\n]*?[^\s*])\1(?![*\w])"#)
+        pattern: #"(?<![*\d])(\*{1,3})([^\s*]|[^\s*][^\n]*?[^\s*])\1(?![*\d])"#)
 
     private func emphasized(plain text: String) -> NSAttributedString {
         let output = NSMutableAttributedString(string: text, attributes: body())
@@ -164,6 +165,10 @@ struct Exporter {
         info.isVerticallyCentered = false
         let width = info.paperSize.width - info.leftMargin - info.rightMargin
         let view = NSTextView(frame: NSRect(x: 0, y: 0, width: width, height: info.paperSize.height))
+        // Only as tall as the text: at a whole page tall plus margins, short text printed a
+        // blank second page.
+        view.minSize = NSSize(width: width, height: 0)
+        view.isVerticallyResizable = true
         view.textContainerInset = .zero
         view.textContainer?.lineFragmentPadding = 0
         view.drawsBackground = false
