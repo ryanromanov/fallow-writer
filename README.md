@@ -20,6 +20,7 @@ Or download the latest `Fallow-x.y.z.zip` from [Releases](https://github.com/rya
 
 ## Features
 - Plain text and Markdown files (`.txt`, `.md`), with autosave and version history
+- Bold and italic (⌘B, ⌘I), written as Markdown's `**bold**` and `*italic*` marks, so the file stays plain text
 - A centered writing column with typewriter scrolling, so the line you're typing stays in the middle of the window
 - Serif, sans serif or monospaced type (the system's own fonts), adjustable size and line spacing
 - Light and dark appearance, and native full screen (⌃⌘F)

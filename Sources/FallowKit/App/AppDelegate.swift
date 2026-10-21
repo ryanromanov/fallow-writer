@@ -214,6 +214,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
             entry.representedObject = style.rawValue
             font.addItem(entry)
         }
+        font.addItem(.separator())
+        // Handled by the text view, which writes them as Markdown's marks.
+        font.addItem(item("Bold", #selector(WriterTextView.toggleBold), "b"))
+        font.addItem(item("Italic", #selector(WriterTextView.toggleItalic), "i"))
         menu.addItem(submenu(font))
         menu.addItem(item("Bigger", #selector(makeTextBigger), "+", target: self))
         // ⌘+ is really ⌘⇧= on most keyboards, so ⌘= works too, as in TextEdit.

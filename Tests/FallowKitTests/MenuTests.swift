@@ -47,6 +47,14 @@ import Testing
         #expect(panel.keyEquivalent == "s" && panel.keyEquivalentModifierMask == [.command, .control])
     }
 
+    @Test func fontHasBoldAndItalic() throws {
+        let font = try submenu("Font", in: mainMenu().0)
+        let bold = try #require(font.items.first { $0.title == "Bold" })
+        let italic = try #require(font.items.first { $0.title == "Italic" })
+        #expect(bold.keyEquivalent == "b" && italic.keyEquivalent == "i")
+        #expect(bold.action == #selector(WriterTextView.toggleBold) && bold.target == nil)
+    }
+
     @Test func helpComesLast() throws {
         let menu = mainMenu().0
         let help = try #require(menu.items.last?.submenu)
