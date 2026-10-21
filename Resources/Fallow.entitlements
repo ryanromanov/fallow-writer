@@ -7,5 +7,8 @@
     <true/>
     <key>com.apple.security.files.user-selected.read-write</key>
     <true/>
+    <!-- File › Print: a sandboxed app can't reach printers without it. -->
+    <key>com.apple.security.print</key>
+    <true/>
 </dict>
 </plist>
