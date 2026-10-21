@@ -31,7 +31,7 @@
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
     <key>NSHumanReadableCopyright</key>
-    <string>MIT License. Not affiliated with OmmWriter.</string>
+    <string>© 2026 Ryan Romanosky. MIT License.</string>
     <key>CFBundleDocumentTypes</key>
     <array>
         <dict>

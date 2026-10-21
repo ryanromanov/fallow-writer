@@ -49,4 +49,4 @@ scripts/screenshots.sh  # renders the README's screenshots into docs/images
 ```
 
 ## License
-MIT. See [LICENSE](LICENSE). Fallow is not affiliated with OmmWriter.
+MIT. See [LICENSE](LICENSE).
