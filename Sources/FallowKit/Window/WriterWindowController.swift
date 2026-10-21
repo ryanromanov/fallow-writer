@@ -7,6 +7,7 @@ final class WriterWindowController: NSWindowController, NSWindowDelegate, NSText
     let writerView: WriterView
     private(set) var fader: ChromeFader!
     private var pendingCount: DispatchWorkItem?
+    private var pendingAnnouncement: DispatchWorkItem?
 
     private let sound: SoundEngine?
     private var soundPopover: NSPopover?
@@ -78,6 +79,28 @@ final class WriterWindowController: NSWindowController, NSWindowDelegate, NSText
     private func updateStatus() {
         let name = (document as? NSDocument)?.displayName ?? "Untitled"
         writerView.statusLabel.stringValue = WordCounter.status(name: name, words: WordCounter.words(in: currentText))
+    }
+
+    /// Shows a choice made from the keyboard in the status line for a moment, without bringing
+    /// back the rest of the window's controls, and tells VoiceOver.
+    func announce(_ text: String) {
+        let label = writerView.statusLabel
+        pendingAnnouncement?.cancel()
+        label.stringValue = text
+        label.alphaValue = 1
+        NSAccessibility.post(element: window as Any, notification: .announcementRequested,
+                             userInfo: [.announcement: text, .priority: NSAccessibilityPriorityLevel.high.rawValue])
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            updateStatus()
+            guard fader.isHidden else { return }
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.9
+                label.animator().alphaValue = 0
+            }
+        }
+        pendingAnnouncement = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: work)
     }
 
     override func synchronizeWindowTitleWithDocumentName() {

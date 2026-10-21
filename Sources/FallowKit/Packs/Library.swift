@@ -196,6 +196,25 @@ extension Library {
         settings.keystrokeSounds = true
     }
 
+    /// The scene after the chosen one (or before it, for a step of -1) among those that can be
+    /// chosen, with Drift last. Wraps around.
+    func scene(after id: String, by step: Int) -> String {
+        let ids = scenes.map(\.id).filter(isAvailable) + [Self.driftID]
+        return Self.cycle(ids, from: resolvedSceneID(id), by: step)
+    }
+
+    /// The ambient sound after the one playing (nil when it's off) among those that can be
+    /// chosen, with Off last. Wraps around.
+    func ambience(after id: String?, by step: Int) -> String? {
+        let ids: [String?] = ambiences.map(\.id).filter(isAvailable) + [nil]
+        return Self.cycle(ids, from: id.map { ambience(for: $0).id }, by: step)
+    }
+
+    private static func cycle<ID: Equatable>(_ ids: [ID], from current: ID, by step: Int) -> ID {
+        let index = ids.firstIndex(of: current) ?? 0
+        return ids[((index + step) % ids.count + ids.count) % ids.count]
+    }
+
     /// True if the item can be used now; otherwise asks for its pack to be unlocked.
     private func unlockIfNeeded(_ id: String) -> Bool {
         if isAvailable(id) { return true }

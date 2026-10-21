@@ -44,6 +44,26 @@ final class TestAccess: PackAccess {
         #expect(Library.driftID == "drift")
     }
 
+    @Test func scenesCycleThroughWhatCanBeChosenThenDrift() {
+        let (library, access) = lockedLibrary()
+        #expect(library.scene(after: "meadow", by: 1) == Library.driftID)
+        #expect(library.scene(after: Library.driftID, by: 1) == "paper")
+        #expect(library.scene(after: "paper", by: -1) == Library.driftID)
+        access.unlocked.insert("extra")
+        #expect(library.scene(after: "meadow", by: 1) == "sample")
+        #expect(library.scene(after: "sample", by: -1) == "meadow")
+    }
+
+    @Test func ambiencesCycleThroughOff() {
+        let (library, access) = lockedLibrary()
+        #expect(library.ambience(after: "lowField", by: 1) == "wind")
+        #expect(library.ambience(after: "wind", by: 1) == nil)
+        #expect(library.ambience(after: nil, by: 1) == "lowField")
+        #expect(library.ambience(after: nil, by: -1) == "wind")
+        access.unlocked.insert("extra")
+        #expect(library.ambience(after: "wind", by: 1) == "hum")
+    }
+
     @Test func everythingIsOpenByDefault() {
         let library = Library()
         library.register(Self.extra)

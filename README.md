@@ -29,7 +29,7 @@ Or download the latest `Fallow-x.y.z.zip` from [Releases](https://github.com/rya
 - Letters settle softly into place as you type (View › Animate Typing; off when Reduce Motion is on)
 - Ambient sound, all generated live with nothing recorded: **Low Field**, a warm, slowly shifting drone, or **Wind**, gusts moving across an open field
 - **Marimba** keystroke sounds: soft wooden notes on a pentatonic scale, so typing makes gentle music. Space, return and delete each have their own sound
-- A speaker button in the corner (or ⌃⌘S) opens a small panel for choosing the scene and sounds and setting their volumes. Fallow remembers your choices
+- A speaker button in the corner (or ⌃⌘S) opens a small panel for choosing the scene and sounds and setting their volumes. Fallow remembers your choices. ⌃⌘← and ⌃⌘→ step through the scenes, and ⌃⌘↑ and ⌃⌘↓ through the ambient sounds
 - Export to PDF, Rich Text and Word, or print, typeset for paper. Markdown comes out formatted, with real headings, emphasis, lists and links
 - Sandboxed: Fallow can only open the files you choose
 

@@ -62,6 +62,28 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
         if let id = sender.representedObject as? String { library.chooseScene(id, in: settings) }
     }
 
+    @objc func nextScene(_ sender: Any?) { cycleScene(by: 1) }
+    @objc func previousScene(_ sender: Any?) { cycleScene(by: -1) }
+    @objc func nextAmbient(_ sender: Any?) { cycleAmbient(by: 1) }
+    @objc func previousAmbient(_ sender: Any?) { cycleAmbient(by: -1) }
+
+    private func cycleScene(by step: Int) {
+        let id = library.scene(after: settings.sceneChoice, by: step)
+        library.chooseScene(id, in: settings)
+        announce("Scene · \(library.scene(for: id)?.title ?? "Drift")")
+    }
+
+    private func cycleAmbient(by step: Int) {
+        let id = library.ambience(after: settings.ambientSound ? settings.ambientChoice : nil, by: step)
+        library.chooseAmbience(id, in: settings)
+        announce("Ambient · \(id.map { library.ambience(for: $0).title } ?? "Off")")
+    }
+
+    /// Names a choice made from the keyboard, which has no panel to show it.
+    private func announce(_ text: String) {
+        (NSApp.mainWindow?.windowController as? WriterWindowController)?.announce(text)
+    }
+
     @objc func chooseAmbient(_ sender: NSMenuItem) {
         library.chooseAmbience(sender.representedObject as? String, in: settings)
     }
@@ -84,6 +106,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
             item.state = settings.animatesTyping ? .on : .off
             // Reduce Motion wins; the setting is kept for when it's turned off again.
             return !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        case #selector(nextAmbient), #selector(previousAmbient):
+            return SoundEngine.shared.isAvailable
         case #selector(chooseAmbient):
             let chosen = settings.ambientSound ? library.ambience(for: settings.ambientChoice).id : nil
             item.state = item.representedObject as? String == chosen ? .on : .off
@@ -276,12 +300,17 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
             }
             menu.addItem(.separator())
             menu.addItem(choice("Drift (Chromotherapy)", Library.driftID, #selector(chooseScene)))
+            menu.addItem(.separator())
+            menu.addItem(item("Next Scene", #selector(nextScene), arrow(NSRightArrowFunctionKey), [.command, .control], target: self))
+            menu.addItem(item("Previous Scene", #selector(previousScene), arrow(NSLeftArrowFunctionKey), [.command, .control], target: self))
         case "Sound":
             heading("Ambient", in: menu)
             for ambience in library.ambiences {
                 menu.addItem(choice(ambience.title, ambience.id, #selector(chooseAmbient), indented: true))
             }
             menu.addItem(choice("Off", nil, #selector(chooseAmbient), indented: true))
+            menu.addItem(item("Next Ambient Sound", #selector(nextAmbient), arrow(NSDownArrowFunctionKey), [.command, .control], target: self))
+            menu.addItem(item("Previous Ambient Sound", #selector(previousAmbient), arrow(NSUpArrowFunctionKey), [.command, .control], target: self))
             menu.addItem(.separator())
             heading("Keystrokes", in: menu)
             for set in library.keystrokeSets {
@@ -295,6 +324,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
             break
         }
     }
+
+    private func arrow(_ key: Int) -> String { String(Character(UnicodeScalar(key)!)) }
 
     private func heading(_ title: String, in menu: NSMenu) {
         let heading = NSMenuItem(title: title, action: nil, keyEquivalent: "")

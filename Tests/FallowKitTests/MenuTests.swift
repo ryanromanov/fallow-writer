@@ -24,7 +24,7 @@ import Testing
 
     @Test func scenesAreUngroupedWithOnlyFallowsOwn() throws {
         let scenes = try submenu("Scene", in: mainMenu().0)
-        #expect(scenes.items.map(\.title) == ["Paper", "Dusk", "Mist", "Meadow", "", "Drift (Chromotherapy)"])
+        #expect(scenes.items.map(\.title) == ["Paper", "Dusk", "Mist", "Meadow", "", "Drift (Chromotherapy)", "", "Next Scene", "Previous Scene"])
         #expect(scenes.items.allSatisfy { $0.indentationLevel == 0 })
     }
 
@@ -32,7 +32,7 @@ import Testing
         let library = Library()
         library.register(LibraryTests.extra)
         let scenes = try submenu("Scene", in: mainMenu(library).0)
-        #expect(scenes.items.map(\.title) == ["Fallow", "Paper", "Dusk", "Mist", "Meadow", "", "Extra", "Sample", "", "Drift (Chromotherapy)"])
+        #expect(scenes.items.map(\.title) == ["Fallow", "Paper", "Dusk", "Mist", "Meadow", "", "Extra", "Sample", "", "Drift (Chromotherapy)", "", "Next Scene", "Previous Scene"])
         let headings = scenes.items.filter { $0.title == "Fallow" || $0.title == "Extra" }
         #expect(headings.allSatisfy { !$0.isEnabled && $0.action == nil })
         #expect(scenes.items.filter { $0.title == "Sample" || $0.title == "Paper" }.allSatisfy { $0.indentationLevel == 1 })
@@ -85,6 +85,29 @@ import Testing
             with: .keyDown, location: .zero, modifierFlags: modifiers, timestamp: 0, windowNumber: 0, context: nil,
             characters: characters, charactersIgnoringModifiers: characters, isARepeat: false, keyCode: keyCode)!
         return menu.performKeyEquivalent(with: event)
+    }
+
+    /// ⌃⌘→ and ⌃⌘← step through the scenes, ⌃⌘↓ and ⌃⌘↑ through the ambient sounds.
+    @Test func arrowsCycleScenesAndSounds() {
+        let settings = settings()
+        let (menu, delegate) = mainMenu(settings: settings)
+        func arrow(_ key: Int, _ code: UInt16) -> Bool {
+            press(String(Character(UnicodeScalar(key)!)), keyCode: code, [.command, .control, .function, .numericPad], in: menu)
+        }
+        settings.sceneChoice = "paper"
+        #expect(arrow(NSRightArrowFunctionKey, 124))
+        #expect(settings.sceneChoice == "dusk")
+        #expect(arrow(NSLeftArrowFunctionKey, 123))
+        #expect(settings.sceneChoice == "paper")
+        settings.ambientChoice = "lowField"
+        settings.ambientSound = true
+        #expect(arrow(NSDownArrowFunctionKey, 125))
+        #expect(settings.ambientChoice == "wind" && settings.ambientSound)
+        #expect(arrow(NSDownArrowFunctionKey, 125))
+        #expect(!settings.ambientSound)
+        #expect(arrow(NSUpArrowFunctionKey, 126))
+        #expect(settings.ambientChoice == "wind" && settings.ambientSound)
+        withExtendedLifetime(delegate) {}
     }
 
     /// ⌘= makes the text bigger, as does ⌘+ (⌘⇧= on most keyboards).
