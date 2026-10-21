@@ -45,21 +45,30 @@ struct Exporter {
 
     // MARK: Plain text
 
-    /// `*italic*`, `**bold**` and `***both***` within a line, inside a word too, as Format › Font
-    /// writes them for part of a word. A mark has to touch its words on the inside, and numbers
-    /// don't count, so `a * b` and `2*3*4` stay as typed.
-    private static let emphasis = try! NSRegularExpression(
-        pattern: #"(?<![*\d])(\*{1,3})([^\s*]|[^\s*][^\n]*?[^\s*])\1(?![*\d])"#)
+    /// Every ASCII punctuation mark but `*`, which Markdown would otherwise read as syntax.
+    private static let notEmphasis = try! NSRegularExpression(pattern: #"[!-)+-/:-@\[-`{-~]"#)
+    /// A `*` between digits, as in `2*3*4`, is multiplication.
+    private static let multiplication = try! NSRegularExpression(pattern: #"(?<=\d)\*(?=\d)"#)
 
+    /// Only `*italic*`, `**bold**` and `***both***`, read by Foundation's Markdown parser, which
+    /// knows how marks pair up even when they touch. Everything else Markdown would read
+    /// (links, code, headings, lists, escapes) is escaped first, so it comes out as typed.
     private func emphasized(plain text: String) -> NSAttributedString {
-        let output = NSMutableAttributedString(string: text, attributes: body())
-        let matches = Self.emphasis.matches(in: text, range: NSRange(location: 0, length: output.length))
-        // From the end, so removing marks doesn't move the matches still to come.
-        for match in matches.reversed() {
-            let marks = match.range(at: 1).length
-            output.addAttribute(.font, value: font(bold: marks >= 2, italic: marks != 2), range: match.range(at: 2))
-            output.deleteCharacters(in: NSRange(location: NSMaxRange(match.range(at: 2)), length: marks))
-            output.deleteCharacters(in: match.range(at: 1))
+        let whole = { (text: String) in NSRange(location: 0, length: (text as NSString).length) }
+        var escaped = Self.notEmphasis.stringByReplacingMatches(in: text, range: whole(text), withTemplate: #"\\$0"#)
+        escaped = Self.multiplication.stringByReplacingMatches(in: escaped, range: whole(escaped), withTemplate: #"\\*"#)
+        let options = AttributedString.MarkdownParsingOptions(
+            allowsExtendedAttributes: false, interpretedSyntax: .inlineOnlyPreservingWhitespace,
+            failurePolicy: .returnPartiallyParsedIfPossible)
+        guard let parsed = try? AttributedString(markdown: escaped, options: options) else {
+            return NSAttributedString(string: text, attributes: body())
+        }
+        let output = NSMutableAttributedString()
+        for run in parsed.runs {
+            let inline = run.inlinePresentationIntent ?? []
+            var attributes = body()
+            attributes[.font] = font(bold: inline.contains(.stronglyEmphasized), italic: inline.contains(.emphasized))
+            output.append(NSAttributedString(string: String(parsed[run.range].characters), attributes: attributes))
         }
         return output
     }

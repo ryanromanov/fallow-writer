@@ -56,6 +56,23 @@ import Testing
         #expect(!font(text, at: "un").fontDescriptor.symbolicTraits.contains(.italic))
     }
 
+    /// Marks for neighboring words touch; they pair up as Markdown pairs them.
+    @Test func plainTextMarksThatTouch() {
+        let text = exporter().typeset("*one*two **three***four*", markdown: false)
+        #expect(text.string == "onetwo threefour")
+        func traits(_ word: String) -> NSFontDescriptor.SymbolicTraits { font(text, at: word).fontDescriptor.symbolicTraits }
+        #expect(traits("one").contains(.italic) && !traits("two").contains(.italic))
+        #expect(traits("three").contains(.bold) && traits("four").contains(.italic) && !traits("four").contains(.bold))
+    }
+
+    /// Nothing else Markdown would read changes plain text.
+    @Test func plainTextKeepsOtherMarkdownAsTyped() {
+        for typed in ["`code` and [a link](https://example.com)", "C:\\path\\to\\file", "&amp; <b>tag</b> _under_ ~strike~",
+                      "# Not a heading\n- nor a list\n> nor a quote", "two spaces  \nthen a line"] {
+            #expect(exporter().typeset(typed, markdown: false).string == typed)
+        }
+    }
+
     @Test func plainTextLeavesOtherAsterisksAlone() {
         for typed in ["2*3*4 = 24", "a * b * c", "**not closed", "*\nacross lines*"] {
             #expect(exporter().typeset(typed, markdown: false).string == typed)
