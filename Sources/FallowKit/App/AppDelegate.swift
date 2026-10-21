@@ -4,24 +4,27 @@ import AppKit
 public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, NSMenuDelegate {
     private let settings: WriterSettings
     private let library: Library
+    private let helpURL: URL
 
     /// True once Fallow itself has launched; false under `swift test`, so tests stay silent.
     static var isRunningApp = false
 
     /// Fallow uses `Library.shared` throughout. A build that adds packs registers them, and
     /// sets the library's access, before creating this.
-    override public convenience init() {
-        self.init(settings: .shared, library: .shared)
+    /// `helpURL` is where Help › Fallow Help goes; a build can send it to its own help page.
+    public convenience init(helpURL: URL = AppDelegate.projectPage) {
+        self.init(settings: .shared, library: .shared, helpURL: helpURL)
     }
 
-    init(settings: WriterSettings, library: Library) {
+    init(settings: WriterSettings, library: Library, helpURL: URL = AppDelegate.projectPage) {
         self.settings = settings
         self.library = library
+        self.helpURL = helpURL
         super.init()
     }
 
-    /// Where Help › Fallow Help goes: the project page, which describes every feature.
-    static let helpURL = URL(string: "https://github.com/ryanromanov/fallow-writer#readme")!
+    /// The project page, which describes every feature.
+    public static let projectPage = URL(string: "https://github.com/ryanromanov/fallow-writer#readme")!
 
     public func applicationWillFinishLaunching(_ notification: Notification) {
         // Create the shared document controller before anything else asks for one.
@@ -43,7 +46,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValid
     }
 
     @objc func makeTextBigger(_ sender: Any?) { settings.fontSize += 1 }
-    @objc func showHelp(_ sender: Any?) { NSWorkspace.shared.open(Self.helpURL) }
+    @objc func showHelp(_ sender: Any?) { NSWorkspace.shared.open(helpURL) }
     @objc func makeTextSmaller(_ sender: Any?) { settings.fontSize -= 1 }
 
     @objc func chooseLineSpacing(_ sender: NSMenuItem) {
