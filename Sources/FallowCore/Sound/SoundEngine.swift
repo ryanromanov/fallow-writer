@@ -92,6 +92,12 @@ public final class SoundEngine {
         update()
     }
 
+    /// Starts again, if anything should be playing, after something else stopped the engine,
+    /// such as a phone call on iPhone.
+    public func resume() {
+        update()
+    }
+
     // MARK: Keystrokes
 
     /// Renders the chosen keystroke set into buffers, unless they're already loaded.

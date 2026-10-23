@@ -127,6 +127,8 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
             self, selector: #selector(close), name: UIApplication.didEnterBackgroundNotification, object: nil)
         NotificationCenter.default.addObserver(
             self, selector: #selector(saveNow), name: UIApplication.didEnterBackgroundNotification, object: nil)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(audioInterrupted), name: AVAudioSession.interruptionNotification, object: nil)
         openLastDocument()
     }
 
@@ -170,6 +172,17 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
         guard isPlaying else { return }
         isPlaying = false
         sound.windowClosed()
+    }
+
+    /// A phone call, Siri or an alarm stops the sound; it comes back when they're done.
+    @objc private func audioInterrupted(_ notification: Notification) {
+        guard let value = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+              AVAudioSession.InterruptionType(rawValue: value) == .ended
+        else { return }
+        Self.activateAudioSession { [weak self] in
+            guard let self, isPlaying else { return }
+            sound.resume()
+        }
     }
 
     private static let audioQueue = DispatchQueue(label: "Fallow audio session", qos: .userInitiated)
