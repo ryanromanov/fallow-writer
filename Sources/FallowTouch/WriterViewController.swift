@@ -128,6 +128,11 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
         tap.delegate = self
         view.addGestureRecognizer(tap)
 
+        // Two fingers swipe through scenes (left and right) and ambient sounds (up and down), as
+        // ⌃⌘ and the arrows do. One finger scrolls, so the page doesn't move under a swipe.
+        textView.panGestureRecognizer.maximumNumberOfTouches = 1
+        textView.addGestureRecognizer(TwoFingerSwipe(target: self, action: #selector(swiped)))
+
         applySettings()
         updateStatus()
         NotificationCenter.default.addObserver(
@@ -285,6 +290,16 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
     @objc private func newDocumentCommand() { newDocument() }
     @objc private func openCommand() { showOpenPicker() }
     @objc private func printCommand() { printDocument() }
+
+    @objc private func swiped(_ swipe: TwoFingerSwipe) {
+        guard swipe.state == .ended, let direction = swipe.direction else { return }
+        switch direction {
+        case .left: cycleScene(by: 1)
+        case .right: cycleScene(by: -1)
+        case .up: cycleAmbient(by: 1)
+        case .down: cycleAmbient(by: -1)
+        }
+    }
 
     @objc private func nextScene() { cycleScene(by: 1) }
     @objc private func previousScene() { cycleScene(by: -1) }
