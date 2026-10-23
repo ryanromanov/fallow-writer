@@ -2,6 +2,9 @@
 // Optionally also writes a PNG of the icon, as the macOS Dock rounds it, for the README.
 //
 //     swift scripts/make-icon.swift Fallow.app/Contents/Resources/AppIcon.icns [icon.png]
+//     swift scripts/make-icon.swift --ios iOS/Fallow/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+//
+// The iOS icon is one 1024-pixel PNG with no alpha channel, which the App Store requires.
 //
 // The art fills the whole square: macOS 26 rounds the corners and adds its own edge. An
 // icon with its own transparent shape would be put on a gray plate instead.
@@ -49,10 +52,10 @@ func drawIcon(_ context: CGContext) {
     context.restoreGState()
 }
 
-func image(pixels: Int, rounded: Bool = false) -> CGImage {
+func image(pixels: Int, rounded: Bool = false, opaque: Bool = false) -> CGImage {
+    let alpha: CGImageAlphaInfo = opaque ? .noneSkipLast : .premultipliedLast
     let context = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0,
-                            space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+                            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: alpha.rawValue)!
     context.scaleBy(x: CGFloat(pixels) / 1024, y: CGFloat(pixels) / 1024)
     if rounded {
         // About the Dock's rounding, for the README's picture only.
@@ -69,8 +72,12 @@ func writePNG(_ image: CGImage, to url: URL) throws {
 }
 
 let arguments = CommandLine.arguments
+if arguments.count == 3, arguments[1] == "--ios" {
+    try writePNG(image(pixels: 1024, opaque: true), to: URL(fileURLWithPath: arguments[2]))
+    exit(0)
+}
 guard arguments.count >= 2 else {
-    FileHandle.standardError.write("usage: swift scripts/make-icon.swift AppIcon.icns [icon.png]\n".data(using: .utf8)!)
+    FileHandle.standardError.write("usage: swift scripts/make-icon.swift AppIcon.icns [icon.png] | --ios AppIcon.png\n".data(using: .utf8)!)
     exit(2)
 }
 let output = URL(fileURLWithPath: arguments[1])

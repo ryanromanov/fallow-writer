@@ -10,6 +10,8 @@ let package = Package(
         .library(name: "FallowKit", targets: ["FallowKit"]),
         // The scenes, sounds and settings that don't depend on the Mac.
         .library(name: "FallowCore", targets: ["FallowCore"]),
+        // The iPhone and iPad app's interface, for the app in iOS/ and builds that add packs.
+        .library(name: "FallowTouch", targets: ["FallowTouch"]),
     ],
     targets: [
         // Scenes, sounds, packs and settings: everything that isn't the Mac's own interface.
@@ -17,6 +19,8 @@ let package = Package(
         // The Mac app: everything but the entry point, so tests can import it.
         .target(name: "FallowKit", dependencies: ["FallowCore"]),
         .executableTarget(name: "Fallow", dependencies: ["FallowKit"]),
+        // The iPhone and iPad interface. Its files are iOS-only, so on the Mac it builds empty.
+        .target(name: "FallowTouch", dependencies: ["FallowCore"]),
         .testTarget(name: "FallowKitTests", dependencies: ["FallowKit", "FallowCore"]),
     ]
 )
