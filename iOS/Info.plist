@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Keys the generated Info.plist has no build setting for. Xcode merges this into it. -->
+<plist version="1.0">
+<dict>
+	<!-- Shows Fallow's folder in the Files app, under On My iPhone (or iPad). -->
+	<key>UIFileSharingEnabled</key>
+	<true/>
+</dict>
+</plist>

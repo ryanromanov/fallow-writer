@@ -3,14 +3,15 @@ import AVFoundation
 import UIKit
 
 /// The writing screen: the scene, the centered writing column, the status line, and the
-/// scene and sound menu.
-public final class WriterViewController: UIViewController, UITextViewDelegate {
+/// document and the scene and sound menus. It opens on the last document, or a blank page.
+public final class WriterViewController: UIViewController, UITextViewDelegate, UIDocumentPickerDelegate {
     static let minimumMargin: CGFloat = 24
 
     let sceneView = SceneView()
     let textView = UITextView()
     let statusLabel = UILabel()
     let soundButton = UIButton(type: .system)
+    let documentButton = UIButton(type: .system)
 
     private let settings: WriterSettings
     private let library: Library
@@ -23,6 +24,10 @@ public final class WriterViewController: UIViewController, UITextViewDelegate {
     private(set) var letters: LetterAnimator!
     /// The letter being typed, between the text view asking to change and changing.
     private var typedLetter: NSRange?
+    /// The open document, or nil for a blank page that hasn't been typed on yet.
+    private var file: TextFile?
+    /// A file outside Fallow's folder, which needs access asked for while it's open.
+    private var scopedURL: URL?
 
     public init(settings: WriterSettings = .shared, library: Library = .shared, sound: SoundEngine = .shared) {
         self.settings = settings
@@ -60,7 +65,20 @@ public final class WriterViewController: UIViewController, UITextViewDelegate {
             done(self?.menuItems() ?? [])
         }])
 
-        for subview in [sceneView, textView, statusLabel, soundButton] as [UIView] {
+        documentButton.setImage(UIImage(systemName: "doc.text"), for: .normal)
+        documentButton.tintColor = Palette.secondary
+        documentButton.accessibilityLabel = "Documents"
+        documentButton.showsMenuAsPrimaryAction = true
+        documentButton.menu = UIMenu(children: [
+            UIAction(title: "New Document", image: UIImage(systemName: "square.and.pencil")) { [weak self] _ in
+                self?.newDocument()
+            },
+            UIAction(title: "Open…", image: UIImage(systemName: "folder")) { [weak self] _ in
+                self?.showOpenPicker()
+            },
+        ])
+
+        for subview in [sceneView, textView, statusLabel, soundButton, documentButton] as [UIView] {
             subview.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview(subview)
         }
@@ -82,6 +100,10 @@ public final class WriterViewController: UIViewController, UITextViewDelegate {
             soundButton.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -12),
             soundButton.widthAnchor.constraint(equalToConstant: 44),
             soundButton.heightAnchor.constraint(equalToConstant: 44),
+            documentButton.centerYAnchor.constraint(equalTo: statusLabel.centerYAnchor),
+            documentButton.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: 12),
+            documentButton.widthAnchor.constraint(equalToConstant: 44),
+            documentButton.heightAnchor.constraint(equalToConstant: 44),
         ])
 
         applySettings()
@@ -94,6 +116,9 @@ public final class WriterViewController: UIViewController, UITextViewDelegate {
             self, selector: #selector(open), name: UIApplication.willEnterForegroundNotification, object: nil)
         NotificationCenter.default.addObserver(
             self, selector: #selector(close), name: UIApplication.didEnterBackgroundNotification, object: nil)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(saveNow), name: UIApplication.didEnterBackgroundNotification, object: nil)
+        openLastDocument()
     }
 
     public override func viewDidAppear(_ animated: Bool) {
@@ -172,6 +197,108 @@ public final class WriterViewController: UIViewController, UITextViewDelegate {
         }
         updateStatus()
         if settings.typewriterScrolling { centerInsertionPoint(animated: true) }
+        if let file {
+            file.edit(textView.text)
+        } else if !textView.text.isEmpty {
+            createFile()
+        }
+    }
+
+    // MARK: Documents
+
+    /// Reopens the document that was open last time. Typing waits until it's there.
+    private func openLastDocument() {
+        guard let url = DocumentPlace.lastDocument() else { return }
+        textView.isEditable = false
+        openFile(url) { [weak self] opened in
+            guard let self else { return }
+            if !opened { DocumentPlace.remember(nil) }
+            textView.isEditable = true
+            if viewIfLoaded?.window != nil { textView.becomeFirstResponder() }
+        }
+    }
+
+    /// Opens a file in place of the current one.
+    private func openFile(_ url: URL, then done: ((Bool) -> Void)? = nil) {
+        closeFile()
+        let scoped = url.startAccessingSecurityScopedResource()
+        let file = TextFile(fileURL: url)
+        file.open { [weak self] success in
+            guard let self, success else {
+                if scoped { url.stopAccessingSecurityScopedResource() }
+                done?(false)
+                return
+            }
+            if scoped { scopedURL = url }
+            self.file = file
+            file.onReload = { [weak self, weak file] in
+                guard let self, let file, self.file === file else { return }
+                show(file.text)
+            }
+            DocumentPlace.remember(url)
+            show(file.text)
+            done?(true)
+        }
+    }
+
+    /// Saves the blank page as a new file in Fallow's folder, once there's something on it.
+    private func createFile() {
+        let file = TextFile(fileURL: DocumentPlace.newFileURL())
+        file.edit(textView.text)
+        self.file = file
+        file.save(to: file.fileURL, for: .forCreating) { [weak self] success in
+            guard let self, self.file === file else { return }
+            guard success else {
+                self.file = nil
+                return
+            }
+            DocumentPlace.remember(file.fileURL)
+            updateStatus()
+        }
+    }
+
+    /// Closes the open document, saving any last edits.
+    private func closeFile() {
+        guard let file else { return }
+        self.file = nil
+        file.onReload = nil
+        file.edit(textView.text)
+        let scoped = scopedURL
+        scopedURL = nil
+        file.close { _ in scoped?.stopAccessingSecurityScopedResource() }
+    }
+
+    private func newDocument() {
+        closeFile()
+        DocumentPlace.remember(nil)
+        show("")
+        textView.becomeFirstResponder()
+    }
+
+    private func showOpenPicker() {
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.plainText])
+        picker.delegate = self
+        present(picker, animated: true)
+    }
+
+    public func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        guard let url = urls.first else { return }
+        openFile(url) { [weak self] _ in self?.textView.becomeFirstResponder() }
+    }
+
+    /// Puts a document's text on the page, with the insertion point at the end.
+    private func show(_ text: String) {
+        letters.finishAll()
+        textView.text = text
+        applySettings()
+        textView.selectedRange = NSRange(location: (text as NSString).length, length: 0)
+        updateStatus()
+        if settings.typewriterScrolling { centerInsertionPoint(animated: false) }
+    }
+
+    /// Saves now, when the app goes to the background.
+    @objc private func saveNow() {
+        file?.autosave(completionHandler: nil)
     }
 
     // MARK: Layout and settings
@@ -231,7 +358,7 @@ public final class WriterViewController: UIViewController, UITextViewDelegate {
     }
 
     private func updateStatus() {
-        statusLabel.text = WordCounter.status(name: "Untitled", words: WordCounter.words(in: textView.text))
+        statusLabel.text = WordCounter.status(name: file?.name ?? "Untitled", words: WordCounter.words(in: textView.text))
     }
 
     @objc private func settingsDidChange() { applySettings() }
