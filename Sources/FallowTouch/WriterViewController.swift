@@ -30,6 +30,8 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
     private var file: TextFile?
     /// A file outside Fallow's folder, which needs access asked for while it's open.
     private var scopedURL: URL?
+    /// Puts the status line back after a choice made from the keyboard was shown in it.
+    private var pendingAnnouncement: DispatchWorkItem?
     /// Fades the status line and buttons while typing.
     private(set) lazy var fader = ChromeFader { [unowned self] in [statusLabel, soundButton, documentButton] }
 
@@ -53,6 +55,7 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
         // The text view already sits clear of the safe area and the keyboard.
         textView.contentInsetAdjustmentBehavior = .never
         textView.tintColor = Palette.caret
+        textView.hideUnderlineButton()
         letters = LetterAnimator(textView: textView)
         registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (controller: WriterViewController, _) in
             controller.letters.finishAll()
@@ -256,6 +259,70 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
         fader.show()
     }
 
+    // MARK: Keyboard shortcuts
+
+    /// A hardware keyboard's shortcuts, as on the Mac. Hold ⌘ to see them listed.
+    public override var keyCommands: [UIKeyCommand]? {
+        [
+            UIKeyCommand(title: "New Document", action: #selector(newDocumentCommand), input: "n", modifierFlags: .command),
+            UIKeyCommand(title: "Open…", action: #selector(openCommand), input: "o", modifierFlags: .command),
+            UIKeyCommand(title: "Print…", action: #selector(printCommand), input: "p", modifierFlags: .command),
+            UIKeyCommand(title: "Scene and Sound…", action: #selector(toggleAtmospherePanel), input: "s", modifierFlags: [.command, .control]),
+            arrow("Next Scene", #selector(nextScene), UIKeyCommand.inputRightArrow),
+            arrow("Previous Scene", #selector(previousScene), UIKeyCommand.inputLeftArrow),
+            arrow("Next Ambient Sound", #selector(nextAmbient), UIKeyCommand.inputDownArrow),
+            arrow("Previous Ambient Sound", #selector(previousAmbient), UIKeyCommand.inputUpArrow),
+        ]
+    }
+
+    /// ⌃⌘ and an arrow, which the text view would otherwise take to move the insertion point.
+    private func arrow(_ title: String, _ action: Selector, _ input: String) -> UIKeyCommand {
+        let command = UIKeyCommand(title: title, action: action, input: input, modifierFlags: [.command, .control])
+        command.wantsPriorityOverSystemBehavior = true
+        return command
+    }
+
+    @objc private func newDocumentCommand() { newDocument() }
+    @objc private func openCommand() { showOpenPicker() }
+    @objc private func printCommand() { printDocument() }
+
+    @objc private func nextScene() { cycleScene(by: 1) }
+    @objc private func previousScene() { cycleScene(by: -1) }
+    @objc private func nextAmbient() { cycleAmbient(by: 1) }
+    @objc private func previousAmbient() { cycleAmbient(by: -1) }
+
+    private func cycleScene(by step: Int) {
+        let id = library.scene(after: settings.sceneChoice, by: step)
+        library.chooseScene(id, in: settings)
+        announce("Scene · \(library.scene(for: id)?.title ?? "Drift")")
+    }
+
+    private func cycleAmbient(by step: Int) {
+        let id = library.ambience(after: settings.ambientSound ? settings.ambientChoice : nil, by: step)
+        library.chooseAmbience(id, in: settings)
+        announce("Ambient · \(id.map { library.ambience(for: $0).title } ?? "Off")")
+    }
+
+    /// Names a choice made from the keyboard in the status line for a moment, since there's no
+    /// panel to show it, and tells VoiceOver.
+    private func announce(_ text: String) {
+        pendingAnnouncement?.cancel()
+        statusLabel.text = text
+        statusLabel.alpha = 1
+        UIAccessibility.post(notification: .announcement, argument: text)
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            pendingAnnouncement = nil
+            updateStatus()
+            guard fader.isHidden else { return }
+            UIView.animate(withDuration: 0.9, delay: 0, options: [.curveEaseInOut, .beginFromCurrentState, .allowUserInteraction]) {
+                self.statusLabel.alpha = 0
+            }
+        }
+        pendingAnnouncement = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: work)
+    }
+
     // MARK: Documents
 
     /// Reopens the document that was open last time. Typing waits until it's there.
@@ -456,6 +523,8 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
     }
 
     private func updateStatus() {
+        // A choice being announced keeps the status line until it's done.
+        if let pendingAnnouncement, !pendingAnnouncement.isCancelled { return }
         statusLabel.text = WordCounter.status(name: file?.name ?? "Untitled", words: WordCounter.words(in: textView.text))
     }
 
@@ -468,9 +537,14 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
     /// delegate first, which `insertText` alone doesn't), for checking the letter animation and
     /// making screenshots in the simulator.
     /// `FALLOW_LETTER_DURATION` slows the animation down, `FALLOW_DEMO_PANEL` opens the scene
-    /// and sound panel, and `FALLOW_DEMO_BOLD` and `FALLOW_DEMO_EXPORT` try bold and export.
+    /// and sound panel, `FALLOW_DEMO_CYCLE` steps the scene and ambient sound, and `FALLOW_DEMO_BOLD` and `FALLOW_DEMO_EXPORT` try bold and export.
     private func typeDemoText() {
         let environment = ProcessInfo.processInfo.environment
+        // FALLOW_DEMO_CYCLE steps the scene and the ambient sound, as ⌃⌘→ and ⌃⌘↓ do.
+        if environment["FALLOW_DEMO_CYCLE"] != nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.nextScene() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in self?.nextAmbient() }
+        }
         if environment["FALLOW_DEMO_PANEL"] != nil {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.showAtmospherePanel() }
         }
@@ -504,8 +578,18 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
 
     // MARK: Scene and sound panel
 
+    /// ⌃⌘S shows the panel, or closes it if it's open.
+    @objc private func toggleAtmospherePanel() {
+        if presentedViewController is UIHostingController<AtmospherePanel> {
+            dismiss(animated: true)
+        } else if presentedViewController == nil {
+            showAtmospherePanel()
+        }
+    }
+
     /// Shows the scene and sound panel as a popover from the speaker button, on iPhone too.
     private func showAtmospherePanel() {
+        fader.show()
         let panel = UIHostingController(rootView: AtmospherePanel(model: AtmosphereModel(settings: settings, library: library)))
         panel.modalPresentationStyle = .popover
         panel.preferredContentSize = panel.sizeThatFits(in: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude))

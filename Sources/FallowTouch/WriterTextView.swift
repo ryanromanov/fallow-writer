@@ -15,6 +15,17 @@ final class WriterTextView: UITextView {
         }
     }
 
+    /// Hides the Underline button in the iPad shortcut bar, where it would sit disabled beside
+    /// Bold and Italic. The buttons belong to the system, which won't let them be regrouped, and
+    /// have no public names, so it's found by its action.
+    func hideUnderlineButton() {
+        for group in inputAssistantItem.trailingBarButtonGroups {
+            for button in group.barButtonItems where button.action.map(NSStringFromSelector)?.contains("Underline") == true {
+                button.isHidden = true
+            }
+        }
+    }
+
     /// Adds or removes the marks as one edit, so it's one step to undo.
     private func toggle(_ emphasis: Emphasis) {
         let edit = emphasis.toggle(in: text as NSString, selection: selectedRange)
