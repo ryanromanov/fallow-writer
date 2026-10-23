@@ -100,7 +100,7 @@ public final class Library {
         didSet { changed() }
     }
 
-    init(packs: [Pack] = [BuiltIn.pack]) {
+    package init(packs: [Pack] = [BuiltIn.pack]) {
         self.packs = packs
     }
 
@@ -148,40 +148,40 @@ public final class Library {
     public var keystrokeSets: [KeystrokeSet] { packs.flatMap(\.keystrokeSets) }
 
     /// The scenes Drift moves through: every unlocked one.
-    var driftScenes: [Scenery] {
+    package var driftScenes: [Scenery] {
         let available = scenes.filter { isAvailable($0.id) }
         return available.isEmpty ? [BuiltIn.paper] : available
     }
 
     /// The scene to show for a saved id, or Fallow's default. Nil means Drift.
-    func scene(for id: String) -> Scenery? {
+    package func scene(for id: String) -> Scenery? {
         if id == Self.driftID { return nil }
         return scenes.first { $0.id == id && isAvailable(id) } ?? BuiltIn.paper
     }
 
-    func ambience(for id: String) -> Ambience {
+    package func ambience(for id: String) -> Ambience {
         ambiences.first { $0.id == id && isAvailable(id) } ?? BuiltIn.lowField
     }
 
-    func keystrokeSet(for id: String) -> KeystrokeSet {
+    package func keystrokeSet(for id: String) -> KeystrokeSet {
         keystrokeSets.first { $0.id == id && isAvailable(id) } ?? BuiltIn.marimba
     }
 
     /// The id a saved choice actually plays as, after falling back.
-    func resolvedSceneID(_ id: String) -> String { scene(for: id)?.id ?? Self.driftID }
+    package func resolvedSceneID(_ id: String) -> String { scene(for: id)?.id ?? Self.driftID }
 }
 
 // MARK: Choosing
 
 extension Library {
     /// Chooses a scene, or Drift. One from a locked pack isn't chosen; its pack is offered instead.
-    func chooseScene(_ id: String, in settings: WriterSettings) {
+    package func chooseScene(_ id: String, in settings: WriterSettings) {
         guard unlockIfNeeded(id) else { return }
         settings.sceneChoice = id
     }
 
     /// Chooses an ambient sound and turns ambient sound on, or turns it off for nil.
-    func chooseAmbience(_ id: String?, in settings: WriterSettings) {
+    package func chooseAmbience(_ id: String?, in settings: WriterSettings) {
         guard let id else { settings.ambientSound = false; return }
         guard unlockIfNeeded(id) else { return }
         settings.ambientChoice = id
@@ -189,7 +189,7 @@ extension Library {
     }
 
     /// Chooses keystroke sounds and turns them on, or turns them off for nil.
-    func chooseKeystrokes(_ id: String?, in settings: WriterSettings) {
+    package func chooseKeystrokes(_ id: String?, in settings: WriterSettings) {
         guard let id else { settings.keystrokeSounds = false; return }
         guard unlockIfNeeded(id) else { return }
         settings.keystrokeChoice = id
@@ -198,14 +198,14 @@ extension Library {
 
     /// The scene after the chosen one (or before it, for a step of -1) among those that can be
     /// chosen, with Drift last. Wraps around.
-    func scene(after id: String, by step: Int) -> String {
+    package func scene(after id: String, by step: Int) -> String {
         let ids = scenes.map(\.id).filter(isAvailable) + [Self.driftID]
         return Self.cycle(ids, from: resolvedSceneID(id), by: step)
     }
 
     /// The ambient sound after the one playing (nil when it's off) among those that can be
     /// chosen, with Off last. Wraps around.
-    func ambience(after id: String?, by step: Int) -> String? {
+    package func ambience(after id: String?, by step: Int) -> String? {
         let ids: [String?] = ambiences.map(\.id).filter(isAvailable) + [nil]
         return Self.cycle(ids, from: id.map { ambience(for: $0).id }, by: step)
     }

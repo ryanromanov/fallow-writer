@@ -1,5 +1,6 @@
 import AppKit
 import Testing
+@testable import FallowCore
 @testable import FallowKit
 
 /// The animation's promises: a letter is hidden only while its copy animates, nothing is ever

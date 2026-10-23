@@ -1,5 +1,6 @@
 import AppKit
 import Testing
+@testable import FallowCore
 @testable import FallowKit
 
 @Suite @MainActor struct ExportTests {

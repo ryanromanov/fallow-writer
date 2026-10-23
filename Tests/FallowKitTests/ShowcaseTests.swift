@@ -1,5 +1,6 @@
 import AppKit
 import Testing
+@testable import FallowCore
 @testable import FallowKit
 
 /// Renders the README's screenshots and the repository's social preview into the folder

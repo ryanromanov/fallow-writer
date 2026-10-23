@@ -15,7 +15,7 @@ public final class SoundEngine {
     /// Auto-repeated keys play this much quieter.
     static let repeatGain: Float = 0.35
 
-    let engine = AVAudioEngine()
+    package let engine = AVAudioEngine()
     private let settings: WriterSettings
     private let library: Library
     private let offline: Bool
@@ -49,7 +49,7 @@ public final class SoundEngine {
     public private(set) var isAvailable = true
 
     /// `offline` renders through `engine.renderOffline` instead of the speakers, for tests.
-    init(settings: WriterSettings, library: Library = .shared, offline: Bool = false) {
+    package init(settings: WriterSettings, library: Library = .shared, offline: Bool = false) {
         self.settings = settings
         self.library = library
         self.offline = offline

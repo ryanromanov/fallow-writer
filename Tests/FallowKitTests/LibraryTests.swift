@@ -1,5 +1,6 @@
 import AppKit
 import Testing
+@testable import FallowCore
 @testable import FallowKit
 
 /// Locks every pack but Fallow's own until it's unlocked, and records what was offered.

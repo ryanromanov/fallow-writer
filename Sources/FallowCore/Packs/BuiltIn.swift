@@ -1,7 +1,7 @@
 /// Fallow's own scenes and sounds, free in every build. Their ids were saved by earlier versions
 /// of Fallow, so they must never change.
-enum BuiltIn {
-    static let paper = Scenery(
+package enum BuiltIn {
+    package static let paper = Scenery(
         id: "paper", title: "Paper",
         light: ScenePalette(top: 0xF6F2EA, middle: 0xF0EADF, bottom: 0xE7DFD1, glow: 0xFFFFFF, glowAlpha: 0.45),
         dark: ScenePalette(top: 0x26221F, middle: 0x1D1B18, bottom: 0x161412, glow: 0xFFD9B3, glowAlpha: 0.05))
@@ -23,7 +23,7 @@ enum BuiltIn {
 
     static let marimba = KeystrokeSet(id: "marimba", title: "Marimba", sounds: MarimbaKeystrokes.sounds(for:))
 
-    static let pack = Pack(
+    package static let pack = Pack(
         id: "fallow", title: "Fallow",
         scenes: [paper, dusk, mist, meadow], ambiences: [lowField, wind], keystrokeSets: [marimba])
 }

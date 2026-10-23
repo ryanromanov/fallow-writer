@@ -1,5 +1,6 @@
 import AppKit
 import Testing
+@testable import FallowCore
 @testable import FallowKit
 
 /// A motion that makes a plain, named layer.

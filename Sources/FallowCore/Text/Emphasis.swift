@@ -1,24 +1,24 @@
-import AppKit
+import Foundation
 
 /// Bold and italic, written as Markdown's own marks: `**bold**` and `*italic*`. Fallow's text is
 /// plain, so these are the marks themselves, and exports turn them into real bold and italics.
-enum Emphasis {
+package enum Emphasis {
     case bold, italic
 
-    var mark: String { self == .bold ? "**" : "*" }
-    var title: String { self == .bold ? "Bold" : "Italic" }
+    package var mark: String { self == .bold ? "**" : "*" }
+    package var title: String { self == .bold ? "Bold" : "Italic" }
 
-    struct Edit: Equatable {
+    package struct Edit: Equatable {
         /// The text to replace, and what replaces it.
-        var range: NSRange
-        var text: String
+        package var range: NSRange
+        package var text: String
         /// What's selected afterwards: the same words, inside or outside their new marks.
-        var selection: NSRange
+        package var selection: NSRange
     }
 
     /// Adds the marks around the selection, or takes them away if they're already there. With
     /// nothing selected, it puts a pair of marks at the insertion point to type between.
-    func toggle(in text: NSString, selection: NSRange) -> Edit {
+    package func toggle(in text: NSString, selection: NSRange) -> Edit {
         var range = Self.trimmed(selection, in: text)
         // Marks selected along with the words count as around them.
         let inside = min(Self.stars(in: text, from: range.location, step: 1, limit: NSMaxRange(range)),
@@ -57,21 +57,5 @@ enum Emphasis {
             index += step
         }
         return count
-    }
-}
-
-extension WriterTextView {
-    @objc func toggleBold(_ sender: Any?) { toggle(.bold) }
-    @objc func toggleItalic(_ sender: Any?) { toggle(.italic) }
-
-    private func toggle(_ emphasis: Emphasis) {
-        guard isEditable, let storage = textStorage else { return }
-        letters.finishAll()
-        let edit = emphasis.toggle(in: storage.string as NSString, selection: selectedRange())
-        guard shouldChangeText(in: edit.range, replacementString: edit.text) else { return }
-        storage.replaceCharacters(in: edit.range, with: edit.text)
-        didChangeText()
-        setSelectedRange(edit.selection)
-        undoManager?.setActionName(emphasis.title)
     }
 }

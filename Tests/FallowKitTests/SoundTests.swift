@@ -2,6 +2,7 @@ import AppKit
 import AVFoundation
 import Foundation
 import Testing
+@testable import FallowCore
 @testable import FallowKit
 
 // These tests never start the realtime engine: generators are tested directly, and the graph

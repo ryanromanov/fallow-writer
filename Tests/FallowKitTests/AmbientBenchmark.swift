@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+@testable import FallowCore
 @testable import FallowKit
 
 /// Times each ambient scene when FALLOW_BENCHMARK is set. Run with an optimized build:
