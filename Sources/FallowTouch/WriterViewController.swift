@@ -4,7 +4,8 @@ import UIKit
 
 /// The writing screen: the scene, the centered writing column, the status line, and the
 /// document and the scene and sound menus. It opens on the last document, or a blank page.
-public final class WriterViewController: UIViewController, UITextViewDelegate, UIDocumentPickerDelegate {
+public final class WriterViewController: UIViewController, UITextViewDelegate, UIDocumentPickerDelegate,
+    UIGestureRecognizerDelegate {
     static let minimumMargin: CGFloat = 24
 
     let sceneView = SceneView()
@@ -28,6 +29,8 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
     private var file: TextFile?
     /// A file outside Fallow's folder, which needs access asked for while it's open.
     private var scopedURL: URL?
+    /// Fades the status line and buttons while typing.
+    private(set) lazy var fader = ChromeFader { [unowned self] in [statusLabel, soundButton, documentButton] }
 
     public init(settings: WriterSettings = .shared, library: Library = .shared, sound: SoundEngine = .shared) {
         self.settings = settings
@@ -105,6 +108,12 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
             documentButton.widthAnchor.constraint(equalToConstant: 44),
             documentButton.heightAnchor.constraint(equalToConstant: 44),
         ])
+
+        // Any touch brings the controls back, without getting in the way of the text view's own.
+        let tap = UITapGestureRecognizer(target: self, action: #selector(touched))
+        tap.cancelsTouchesInView = false
+        tap.delegate = self
+        view.addGestureRecognizer(tap)
 
         applySettings()
         updateStatus()
@@ -191,6 +200,7 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
     }
 
     public func textViewDidChange(_ textView: UITextView) {
+        fader.typed()
         if let range = typedLetter {
             typedLetter = nil
             letters.animate(range)
@@ -202,6 +212,23 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
         } else if !textView.text.isEmpty {
             createFile()
         }
+    }
+
+    // MARK: Controls
+
+    @objc private func touched() { fader.show() }
+
+    public func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                                  shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+        true
+    }
+
+    public func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        fader.show()
+    }
+
+    public func textViewDidEndEditing(_ textView: UITextView) {
+        fader.show()
     }
 
     // MARK: Documents
@@ -377,6 +404,8 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
         var remaining = Array(text)
         Timer.scheduledTimer(withTimeInterval: 0.12, repeats: true) { [weak self] timer in
             guard let self, !remaining.isEmpty else { return timer.invalidate() }
+            // Wait while the last document opens.
+            guard textView.isEditable else { return }
             let letter = String(remaining.removeFirst())
             if self.textView(textView, shouldChangeTextIn: textView.selectedRange, replacementText: letter) {
                 textView.insertText(letter)
