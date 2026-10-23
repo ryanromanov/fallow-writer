@@ -15,8 +15,10 @@ public final class WriterViewController: UIViewController, UITextViewDelegate {
     private let settings: WriterSettings
     private let library: Library
     private let sound: SoundEngine
-    /// Whether this screen has told the sound engine it's open.
+    /// Whether this screen can be heard: on screen, with the app in front.
     private var isOpen = false
+    /// Whether this screen has told the sound engine it's open, which waits for the audio session.
+    private var isPlaying = false
     /// Settles each typed letter into place.
     private(set) var letters: LetterAnimator!
     /// The letter being typed, between the text view asking to change and changing.
@@ -121,15 +123,32 @@ public final class WriterViewController: UIViewController, UITextViewDelegate {
     @objc private func open() {
         guard !isOpen, viewIfLoaded?.window != nil else { return }
         isOpen = true
-        try? AVAudioSession.sharedInstance().setCategory(.ambient)
-        try? AVAudioSession.sharedInstance().setActive(true)
-        sound.windowOpened()
+        Self.activateAudioSession { [weak self] in
+            guard let self, isOpen, !isPlaying else { return }
+            isPlaying = true
+            sound.windowOpened()
+        }
     }
 
     @objc private func close() {
         guard isOpen else { return }
         isOpen = false
+        guard isPlaying else { return }
+        isPlaying = false
         sound.windowClosed()
+    }
+
+    private static let audioQueue = DispatchQueue(label: "Fallow audio session", qos: .userInitiated)
+
+    /// Activates the audio session off the main thread, where it can take a moment, then calls
+    /// `ready` on the main thread.
+    private static func activateAudioSession(then ready: @escaping () -> Void) {
+        audioQueue.async {
+            let session = AVAudioSession.sharedInstance()
+            try? session.setCategory(.ambient)
+            try? session.setActive(true)
+            DispatchQueue.main.async(execute: ready)
+        }
     }
 
     public func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
