@@ -142,11 +142,11 @@ struct TestMotion: SceneMotion {
 
     /// In Drift, a scene's motion is there exactly while its colors are.
     @Test func driftOpacityFollowsTheColors() {
-        let times = BackgroundView.driftTimes(count: 3).map(\.doubleValue)
+        let times = SceneLayers.driftTimes(count: 3).map(\.doubleValue)
         let expected: [Double] = (0...6).map { Double($0) / 6 }
         #expect(zip(times, expected).allSatisfy { abs($0 - $1) < 1e-12 } && times.count == 7)
-        let first = BackgroundView.driftOpacity(index: 0, count: 3).values as! [Float]
-        let last = BackgroundView.driftOpacity(index: 2, count: 3).values as! [Float]
+        let first = SceneLayers.driftOpacity(index: 0, count: 3).values as! [Float]
+        let last = SceneLayers.driftOpacity(index: 2, count: 3).values as! [Float]
         #expect(first == [1, 1, 0, 0, 0, 0, 1])
         #expect(last == [0, 0, 0, 0, 1, 1, 0])
     }
