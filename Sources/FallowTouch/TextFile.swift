@@ -17,6 +17,9 @@ final class TextFile: UIDocument {
     /// The file's name, without its extension.
     var name: String { fileURL.deletingPathExtension().lastPathComponent }
 
+    /// Markdown documents export formatted; plain text exports as typed.
+    var isMarkdown: Bool { ["md", "markdown"].contains(fileURL.pathExtension.lowercased()) }
+
     /// Records an edit, to be saved soon.
     func edit(_ text: String) {
         guard text != self.text else { return }

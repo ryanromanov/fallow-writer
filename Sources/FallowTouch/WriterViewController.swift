@@ -77,6 +77,18 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
             UIAction(title: "Open…", image: UIImage(systemName: "folder")) { [weak self] _ in
                 self?.showOpenPicker()
             },
+            UIMenu(options: .displayInline, children: [
+                UIAction(title: "Share…", image: UIImage(systemName: "square.and.arrow.up")) { [weak self] _ in
+                    self?.shareDocument()
+                },
+                UIMenu(title: "Export", image: UIImage(systemName: "arrow.down.doc"), children: [
+                    UIAction(title: "PDF") { [weak self] _ in self?.export(as: "pdf") },
+                    UIAction(title: "Rich Text") { [weak self] _ in self?.export(as: "rtf") },
+                ]),
+                UIAction(title: "Print…", image: UIImage(systemName: "printer")) { [weak self] _ in
+                    self?.printDocument()
+                },
+            ]),
         ])
 
         for subview in [sceneView, textView, statusLabel, soundButton, documentButton] as [UIView] {
@@ -336,6 +348,52 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
         if settings.typewriterScrolling { centerInsertionPoint(animated: false) }
     }
 
+    // MARK: Sharing, export and printing
+
+    private var documentName: String { file?.name ?? "Untitled" }
+
+    private func typeset() -> NSAttributedString {
+        Typesetter(settings: settings).typeset(textView.text, markdown: file?.isMarkdown ?? false)
+    }
+
+    /// Shares the document's own file, saved first. A blank page is shared as its text.
+    private func shareDocument() {
+        guard let file else { return share([textView.text ?? ""]) }
+        file.edit(textView.text)
+        file.save(to: file.fileURL, for: .forOverwriting) { [weak self] _ in
+            self?.share([file.fileURL])
+        }
+    }
+
+    /// Typesets the document and offers it as a PDF or Rich Text file.
+    private func export(as fileExtension: String) {
+        let text = typeset()
+        do {
+            let data = fileExtension == "pdf" ? Exports.pdf(text) : try Exports.richText(text)
+            share([try Exports.file(named: documentName, extension: fileExtension, data: data)])
+        } catch {
+            let alert = UIAlertController(title: "Couldn't export “\(documentName)”", message: error.localizedDescription, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            present(alert, animated: true)
+        }
+    }
+
+    private func share(_ items: [Any]) {
+        let sheet = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        sheet.popoverPresentationController?.sourceView = documentButton
+        present(sheet, animated: true)
+    }
+
+    private func printDocument() {
+        let printer = UIPrintInteractionController.shared
+        let info = UIPrintInfo.printInfo()
+        info.jobName = documentName
+        info.outputType = .general
+        printer.printInfo = info
+        printer.printFormatter = Exports.formatter(typeset())
+        printer.present(from: documentButton.bounds, in: documentButton, animated: true)
+    }
+
     /// Saves now, when the app goes to the background.
     @objc private func saveNow() {
         file?.autosave(completionHandler: nil)
@@ -409,8 +467,8 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
     /// Types `FALLOW_DEMO_TEXT` a letter at a time, the way the keyboard does (asking the
     /// delegate first, which `insertText` alone doesn't), for checking the letter animation and
     /// making screenshots in the simulator.
-    /// `FALLOW_LETTER_DURATION` slows the animation down, and `FALLOW_DEMO_PANEL` opens the
-    /// scene and sound panel.
+    /// `FALLOW_LETTER_DURATION` slows the animation down, `FALLOW_DEMO_PANEL` opens the scene
+    /// and sound panel, and `FALLOW_DEMO_BOLD` and `FALLOW_DEMO_EXPORT` try bold and export.
     private func typeDemoText() {
         let environment = ProcessInfo.processInfo.environment
         if environment["FALLOW_DEMO_PANEL"] != nil {
@@ -427,6 +485,10 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
                 if environment["FALLOW_DEMO_BOLD"] != nil, let word = textView.text.split(separator: " ").last {
                     textView.selectedRange = NSRange(word.startIndex..<word.endIndex, in: textView.text)
                     textView.toggleBoldface(nil)
+                }
+                // FALLOW_DEMO_EXPORT then writes the PDF export next to the document.
+                if environment["FALLOW_DEMO_EXPORT"] != nil {
+                    try? Exports.pdf(typeset()).write(to: DocumentPlace.folder.appendingPathComponent("Export.pdf"))
                 }
                 return
             }
