@@ -1,11 +1,12 @@
 #if os(iOS)
 import AVFoundation
+import SwiftUI
 import UIKit
 
 /// The writing screen: the scene, the centered writing column, the status line, and the
 /// document and the scene and sound menus. It opens on the last document, or a blank page.
 public final class WriterViewController: UIViewController, UITextViewDelegate, UIDocumentPickerDelegate,
-    UIGestureRecognizerDelegate {
+    UIGestureRecognizerDelegate, UIPopoverPresentationControllerDelegate {
     static let minimumMargin: CGFloat = 24
 
     let sceneView = SceneView()
@@ -63,10 +64,7 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
         soundButton.setImage(UIImage(systemName: "speaker.wave.2"), for: .normal)
         soundButton.tintColor = Palette.secondary
         soundButton.accessibilityLabel = "Scene and sound"
-        soundButton.showsMenuAsPrimaryAction = true
-        soundButton.menu = UIMenu(children: [UIDeferredMenuElement.uncached { [weak self] done in
-            done(self?.menuItems() ?? [])
-        }])
+        soundButton.addAction(UIAction { [weak self] _ in self?.showAtmospherePanel() }, for: .primaryActionTriggered)
 
         documentButton.setImage(UIImage(systemName: "doc.text"), for: .normal)
         documentButton.tintColor = Palette.secondary
@@ -214,6 +212,8 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
 
     public func textViewDidChange(_ textView: UITextView) {
         fader.typed()
+        // Writing again means you're done with the panel.
+        if presentedViewController is UIHostingController<AtmospherePanel> { dismiss(animated: true) }
         if let range = typedLetter {
             typedLetter = nil
             letters.animate(range)
@@ -409,9 +409,13 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
     /// Types `FALLOW_DEMO_TEXT` a letter at a time, the way the keyboard does (asking the
     /// delegate first, which `insertText` alone doesn't), for checking the letter animation and
     /// making screenshots in the simulator.
-    /// `FALLOW_LETTER_DURATION` slows the animation down.
+    /// `FALLOW_LETTER_DURATION` slows the animation down, and `FALLOW_DEMO_PANEL` opens the
+    /// scene and sound panel.
     private func typeDemoText() {
         let environment = ProcessInfo.processInfo.environment
+        if environment["FALLOW_DEMO_PANEL"] != nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.showAtmospherePanel() }
+        }
         guard let text = environment["FALLOW_DEMO_TEXT"] else { return }
         if let duration = environment["FALLOW_LETTER_DURATION"].flatMap(Double.init) { LetterAnimator.duration = duration }
         var remaining = Array(text)
@@ -436,40 +440,24 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
     }
     #endif
 
-    // MARK: Scene and sound menu
+    // MARK: Scene and sound panel
 
-    private func menuItems() -> [UIMenuElement] {
-        let scenes = library.scenes.map { scene in
-            UIAction(title: scene.title, state: library.resolvedSceneID(settings.sceneChoice) == scene.id ? .on : .off) { [self] _ in
-                library.chooseScene(scene.id, in: settings)
-            }
-        } + [UIAction(title: "Drift", state: library.resolvedSceneID(settings.sceneChoice) == Library.driftID ? .on : .off) { [self] _ in
-            library.chooseScene(Library.driftID, in: settings)
-        }]
+    /// Shows the scene and sound panel as a popover from the speaker button, on iPhone too.
+    private func showAtmospherePanel() {
+        let panel = UIHostingController(rootView: AtmospherePanel(model: AtmosphereModel(settings: settings, library: library)))
+        panel.modalPresentationStyle = .popover
+        panel.preferredContentSize = panel.sizeThatFits(in: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude))
+        if let popover = panel.popoverPresentationController {
+            popover.sourceView = soundButton
+            popover.permittedArrowDirections = [.down]
+            popover.delegate = self
+        }
+        present(panel, animated: true)
+    }
 
-        let playing = settings.ambientSound ? library.ambience(for: settings.ambientChoice).id : nil
-        let ambiences = library.ambiences.map { ambience in
-            UIAction(title: ambience.title, state: playing == ambience.id ? .on : .off) { [self] _ in
-                library.chooseAmbience(ambience.id, in: settings)
-            }
-        } + [UIAction(title: "Off", state: playing == nil ? .on : .off) { [self] _ in
-            library.chooseAmbience(nil, in: settings)
-        }]
-
-        let typing = settings.keystrokeSounds ? library.keystrokeSet(for: settings.keystrokeChoice).id : nil
-        let keystrokes = library.keystrokeSets.map { set in
-            UIAction(title: set.title, state: typing == set.id ? .on : .off) { [self] _ in
-                library.chooseKeystrokes(set.id, in: settings)
-            }
-        } + [UIAction(title: "Off", state: typing == nil ? .on : .off) { [self] _ in
-            library.chooseKeystrokes(nil, in: settings)
-        }]
-
-        return [
-            UIMenu(title: "Scene", image: UIImage(systemName: "photo"), children: scenes),
-            UIMenu(title: "Ambient Sound", image: UIImage(systemName: "wind"), children: ambiences),
-            UIMenu(title: "Keystrokes", image: UIImage(systemName: "keyboard"), children: keystrokes),
-        ]
+    public func adaptivePresentationStyle(for controller: UIPresentationController,
+                                          traitCollection: UITraitCollection) -> UIModalPresentationStyle {
+        .none
     }
 }
 
