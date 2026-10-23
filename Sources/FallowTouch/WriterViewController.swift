@@ -9,7 +9,7 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
     static let minimumMargin: CGFloat = 24
 
     let sceneView = SceneView()
-    let textView = UITextView()
+    let textView = WriterTextView()
     let statusLabel = UILabel()
     let soundButton = UIButton(type: .system)
     let documentButton = UIButton(type: .system)
@@ -403,7 +403,16 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
         if let duration = environment["FALLOW_LETTER_DURATION"].flatMap(Double.init) { LetterAnimator.duration = duration }
         var remaining = Array(text)
         Timer.scheduledTimer(withTimeInterval: 0.12, repeats: true) { [weak self] timer in
-            guard let self, !remaining.isEmpty else { return timer.invalidate() }
+            guard let self else { return timer.invalidate() }
+            if remaining.isEmpty {
+                timer.invalidate()
+                // FALLOW_DEMO_BOLD then makes the last word bold, as ⌘B would.
+                if environment["FALLOW_DEMO_BOLD"] != nil, let word = textView.text.split(separator: " ").last {
+                    textView.selectedRange = NSRange(word.startIndex..<word.endIndex, in: textView.text)
+                    textView.toggleBoldface(nil)
+                }
+                return
+            }
             // Wait while the last document opens.
             guard textView.isEditable else { return }
             let letter = String(remaining.removeFirst())
