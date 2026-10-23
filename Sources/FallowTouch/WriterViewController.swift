@@ -17,6 +17,10 @@ public final class WriterViewController: UIViewController, UITextViewDelegate {
     private let sound: SoundEngine
     /// Whether this screen has told the sound engine it's open.
     private var isOpen = false
+    /// Settles each typed letter into place.
+    private(set) var letters: LetterAnimator!
+    /// The letter being typed, between the text view asking to change and changing.
+    private var typedLetter: NSRange?
 
     public init(settings: WriterSettings = .shared, library: Library = .shared, sound: SoundEngine = .shared) {
         self.settings = settings
@@ -38,6 +42,10 @@ public final class WriterViewController: UIViewController, UITextViewDelegate {
         // The text view already sits clear of the safe area and the keyboard.
         textView.contentInsetAdjustmentBehavior = .never
         textView.tintColor = Palette.caret
+        letters = LetterAnimator(textView: textView)
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (controller: WriterViewController, _) in
+            controller.letters.finishAll()
+        }
 
         statusLabel.textColor = Palette.secondary
         statusLabel.textAlignment = .center
@@ -90,6 +98,10 @@ public final class WriterViewController: UIViewController, UITextViewDelegate {
         super.viewDidAppear(animated)
         open()
         textView.becomeFirstResponder()
+        if let undoManager = textView.undoManager { letters.watch(undoManager) }
+        #if DEBUG
+        typeDemoText()
+        #endif
     }
 
     public override func viewDidDisappear(_ animated: Bool) {
@@ -121,11 +133,24 @@ public final class WriterViewController: UIViewController, UITextViewDelegate {
     }
 
     public func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
-        if let kind = KeyClass(replacing: range, with: text) { sound.keystroke(kind) }
+        let kind = KeyClass(replacing: range, with: text)
+        if let kind { sound.keystroke(kind) }
+        // Animate one typed letter at a time, and never input-method text (marked text).
+        // Anything else, such as a delete, paste or autocorrection, settles every letter first.
+        typedLetter = nil
+        if kind == .letter, textView.markedTextRange == nil, settings.animatesTyping, !UIAccessibility.isReduceMotionEnabled {
+            typedLetter = NSRange(location: range.location, length: (text as NSString).length)
+        } else if kind != .space, kind != .newline {
+            letters.finishAll()
+        }
         return true
     }
 
     public func textViewDidChange(_ textView: UITextView) {
+        if let range = typedLetter {
+            typedLetter = nil
+            letters.animate(range)
+        }
         updateStatus()
         if settings.typewriterScrolling { centerInsertionPoint(animated: true) }
     }
@@ -170,6 +195,7 @@ public final class WriterViewController: UIViewController, UITextViewDelegate {
     }
 
     private func applySettings() {
+        letters.finishAll()
         let attributes: [NSAttributedString.Key: Any] = [
             .font: settings.font,
             .paragraphStyle: settings.paragraphStyle,
@@ -192,6 +218,26 @@ public final class WriterViewController: UIViewController, UITextViewDelegate {
     @objc private func settingsDidChange() { applySettings() }
 
     @objc private func libraryDidChange() { sceneView.libraryChanged() }
+
+    #if DEBUG
+    /// Types `FALLOW_DEMO_TEXT` a letter at a time, the way the keyboard does (asking the
+    /// delegate first, which `insertText` alone doesn't), for checking the letter animation and
+    /// making screenshots in the simulator.
+    /// `FALLOW_LETTER_DURATION` slows the animation down.
+    private func typeDemoText() {
+        let environment = ProcessInfo.processInfo.environment
+        guard let text = environment["FALLOW_DEMO_TEXT"] else { return }
+        if let duration = environment["FALLOW_LETTER_DURATION"].flatMap(Double.init) { LetterAnimator.duration = duration }
+        var remaining = Array(text)
+        Timer.scheduledTimer(withTimeInterval: 0.12, repeats: true) { [weak self] timer in
+            guard let self, !remaining.isEmpty else { return timer.invalidate() }
+            let letter = String(remaining.removeFirst())
+            if self.textView(textView, shouldChangeTextIn: textView.selectedRange, replacementText: letter) {
+                textView.insertText(letter)
+            }
+        }
+    }
+    #endif
 
     // MARK: Scene and sound menu
 
