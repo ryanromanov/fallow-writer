@@ -35,6 +35,8 @@ public final class WriterViewController: UIViewController, UITextViewDelegate {
         textView.delegate = self
         textView.alwaysBounceVertical = true
         textView.keyboardDismissMode = .interactive
+        // The text view already sits clear of the safe area and the keyboard.
+        textView.contentInsetAdjustmentBehavior = .never
         textView.tintColor = Palette.caret
 
         statusLabel.textColor = Palette.secondary
@@ -125,11 +127,15 @@ public final class WriterViewController: UIViewController, UITextViewDelegate {
 
     public func textViewDidChange(_ textView: UITextView) {
         updateStatus()
+        if settings.typewriterScrolling { centerInsertionPoint(animated: true) }
     }
 
     // MARK: Layout and settings
 
     /// Centers a column as many characters wide as the font style's `measure`, as on the Mac.
+    /// With typewriter scrolling, the text gets half the visible height above and below so any
+    /// line can sit in the middle. The text view ends at the keyboard, so that's the middle of
+    /// what can be seen.
     private func layoutColumn() {
         let font = settings.font
         let sample = "the quick brown fox jumps over the lazy dog" as NSString
@@ -137,8 +143,30 @@ public final class WriterViewController: UIViewController, UITextViewDelegate {
         let padding = textView.textContainer.lineFragmentPadding
         let width = textView.bounds.width
         let side = max(Self.minimumMargin, (width - characterWidth * settings.fontStyle.measure) / 2 - padding).rounded()
-        let inset = UIEdgeInsets(top: 48, left: side, bottom: 48, right: side)
-        if textView.textContainerInset != inset { textView.textContainerInset = inset }
+        let vertical = settings.typewriterScrolling ? max(48, textView.bounds.height / 2 - font.lineHeight).rounded() : 48
+        let inset = UIEdgeInsets(top: vertical, left: side, bottom: vertical, right: side)
+        guard textView.textContainerInset != inset else { return }
+        textView.textContainerInset = inset
+        if settings.typewriterScrolling { centerInsertionPoint(animated: false) }
+    }
+
+    /// Scrolls so the insertion point sits in the middle of what can be seen.
+    private func centerInsertionPoint(animated: Bool) {
+        guard let position = textView.selectedTextRange?.end else { return }
+        textView.layoutIfNeeded()
+        let caret = textView.caretRect(for: position)
+        guard !caret.isNull, !caret.isInfinite else { return }
+        let maxY = max(0, textView.contentSize.height - textView.bounds.height)
+        let y = min(max(0, (caret.midY - textView.bounds.height / 2).rounded()), maxY)
+        guard abs(y - textView.contentOffset.y) >= 1 else { return }
+        let offset = CGPoint(x: 0, y: y)
+        if animated {
+            UIView.animate(withDuration: 0.15, delay: 0, options: [.curveEaseOut, .beginFromCurrentState]) {
+                self.textView.contentOffset = offset
+            }
+        } else {
+            textView.contentOffset = offset
+        }
     }
 
     private func applySettings() {
@@ -154,6 +182,7 @@ public final class WriterViewController: UIViewController, UITextViewDelegate {
         statusLabel.font = settings.chromeFont(size: 12)
         sceneView.choice = settings.sceneChoice
         view.setNeedsLayout()
+        if settings.typewriterScrolling { centerInsertionPoint(animated: false) }
     }
 
     private func updateStatus() {
