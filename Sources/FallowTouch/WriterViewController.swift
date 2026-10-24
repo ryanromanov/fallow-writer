@@ -357,7 +357,7 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
         closeFile()
         let scoped = url.startAccessingSecurityScopedResource()
         let file = TextFile(fileURL: url)
-        file.open { [weak self] success in
+        file.open { [weak self, file] success in
             guard let self, success else {
                 if scoped { url.stopAccessingSecurityScopedResource() }
                 done?(false)
