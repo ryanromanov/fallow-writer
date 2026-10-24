@@ -58,7 +58,8 @@ struct AtmospherePanel: View {
                 volume("Keystroke volume", Binding(
                     get: { Double(settings.keystrokeVolume) }, set: { settings.keystrokeVolume = Float($0) }))
             }
-            Text("Sounds best with headphones")
+            // The system keyboard's own clicks play under Fallow's, and only Settings can turn them off.
+            Text("Sounds best with headphones, and with keyboard sound off in Settings › Sounds & Haptics")
                 .font(Font(settings.chromeFont(size: 12)).italic())
                 .foregroundStyle(Color(Palette.secondary))
         }
