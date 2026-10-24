@@ -38,10 +38,16 @@ final class TwoFingerSwipe: UIGestureRecognizer {
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
         guard let start, state == .began || state == .changed, numberOfTouches == 2 else { return }
         let point = centroid
-        let dx = point.x - start.x, dy = point.y - start.y
-        guard max(abs(dx), abs(dy)) >= Self.distance else { return state = .changed }
-        direction = abs(dx) > abs(dy) ? (dx < 0 ? .left : .right) : (dy < 0 ? .up : .down)
+        guard let direction = Self.direction(dx: point.x - start.x, dy: point.y - start.y) else { return state = .changed }
+        self.direction = direction
         state = .ended
+    }
+
+    /// The way fingers that moved this far went, along whichever axis they moved more; nil until
+    /// they've gone far enough.
+    static func direction(dx: CGFloat, dy: CGFloat) -> Direction? {
+        guard max(abs(dx), abs(dy)) >= distance else { return nil }
+        return abs(dx) > abs(dy) ? (dx < 0 ? .left : .right) : (dy < 0 ? .up : .down)
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {

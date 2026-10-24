@@ -1,5 +1,9 @@
 .build/
-.swiftpm/
+.swiftpm/*
+# Except the shared scheme that runs the iOS tests (scripts/test-ios.sh).
+!.swiftpm/xcode/
+.swiftpm/xcode/*
+!.swiftpm/xcode/xcshareddata/
 DerivedData/
 xcuserdata/
 *.app

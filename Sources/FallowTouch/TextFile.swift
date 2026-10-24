@@ -51,7 +51,7 @@ enum DocumentPlace {
     }
 
     /// A new file in Fallow's folder: Untitled.txt, or Untitled 2.txt and so on if that's taken.
-    static func newFileURL() -> URL {
+    static func newFileURL(in folder: URL = folder) -> URL {
         var number = 1
         while true {
             let name = number == 1 ? "Untitled" : "Untitled \(number)"

@@ -22,5 +22,7 @@ let package = Package(
         // The iPhone and iPad interface. Its files are iOS-only, so on the Mac it builds empty.
         .target(name: "FallowTouch", dependencies: ["FallowCore"]),
         .testTarget(name: "FallowKitTests", dependencies: ["FallowKit", "FallowCore"]),
+        // The iPhone and iPad interface's tests, run on an iOS simulator (scripts/test-ios.sh).
+        .testTarget(name: "FallowTouchTests", dependencies: ["FallowTouch"]),
     ]
 )
