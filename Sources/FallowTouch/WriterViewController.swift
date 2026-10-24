@@ -147,6 +147,7 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
             self, selector: #selector(saveNow), name: UIApplication.didEnterBackgroundNotification, object: nil)
         NotificationCenter.default.addObserver(
             self, selector: #selector(audioInterrupted), name: AVAudioSession.interruptionNotification, object: nil)
+        DocumentPlace.findCloudFolder()
         openLastDocument()
     }
 
@@ -365,10 +366,7 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
             }
             if scoped { scopedURL = url }
             self.file = file
-            file.onReload = { [weak self, weak file] in
-                guard let self, let file, self.file === file else { return }
-                show(file.text)
-            }
+            follow(file)
             DocumentPlace.remember(url)
             show(file.text)
             done?(true)
@@ -380,6 +378,7 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
         let file = TextFile(fileURL: DocumentPlace.newFileURL())
         file.edit(textView.text)
         self.file = file
+        follow(file)
         file.save(to: file.fileURL, for: .forCreating) { [weak self] success in
             guard let self, self.file === file else { return }
             guard success else {
@@ -391,11 +390,25 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
         }
     }
 
+    /// Shows what other devices do to the open file: their edits, and a pause in editing while
+    /// iCloud brings one in.
+    private func follow(_ file: TextFile) {
+        file.onReload = { [weak self, weak file] in
+            guard let self, let file, self.file === file else { return }
+            show(file.text)
+        }
+        file.onEditableChange = { [weak self, weak file] editable in
+            guard let self, let file, self.file === file else { return }
+            textView.isEditable = editable
+        }
+    }
+
     /// Closes the open document, saving any last edits.
     private func closeFile() {
         guard let file else { return }
         self.file = nil
         file.onReload = nil
+        file.onEditableChange = nil
         file.edit(textView.text)
         let scoped = scopedURL
         scopedURL = nil

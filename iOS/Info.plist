@@ -6,5 +6,19 @@
 	<!-- Shows Fallow's folder in the Files app, under On My iPhone (or iPad). -->
 	<key>UIFileSharingEnabled</key>
 	<true/>
+	<!-- Shows Fallow's iCloud container in iCloud Drive, as a folder named Fallow with its icon.
+	     iCloud Drive picks up a change to these only when the build number goes up. -->
+	<key>NSUbiquitousContainers</key>
+	<dict>
+		<key>iCloud.com.ryanromanov.Fallow</key>
+		<dict>
+			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
+			<true/>
+			<key>NSUbiquitousContainerName</key>
+			<string>Fallow</string>
+			<key>NSUbiquitousContainerSupportedFolderLevels</key>
+			<string>Any</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

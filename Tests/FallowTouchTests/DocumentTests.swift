@@ -14,6 +14,43 @@ import Testing
         #expect(DocumentPlace.newFileURL(in: folder).lastPathComponent == "Untitled 3.txt")
     }
 
+    /// A file in iCloud that hasn't downloaded is only a placeholder, but its name is still taken.
+    @Test func filesNotYetDownloadedAreTaken() throws {
+        let folder = try temporaryFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try Data().write(to: folder.appendingPathComponent(".Untitled.txt.icloud"))
+        #expect(DocumentPlace.newFileURL(in: folder).lastPathComponent == "Untitled 2.txt")
+    }
+
+    /// Another device's version of a file, kept beside it after a conflict.
+    @Test func conflictCopiesAreNamedForTheirDevice() throws {
+        let folder = try temporaryFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let first = DocumentPlace.freeURL(in: folder, named: "Notes (iPad)", extension: "md")
+        #expect(first.lastPathComponent == "Notes (iPad).md")
+        try Data().write(to: first)
+        #expect(DocumentPlace.freeURL(in: folder, named: "Notes (iPad)", extension: "md").lastPathComponent == "Notes (iPad) 2.md")
+    }
+
+    /// iCloud Drive shows the container's Documents folder, which is made if it's missing.
+    @Test func iCloudDocumentsGoInTheContainersDocumentsFolder() throws {
+        let container = try temporaryFolder()
+        defer { try? FileManager.default.removeItem(at: container) }
+        let folder = try #require(DocumentPlace.documentsFolder(in: container))
+        #expect(folder.lastPathComponent == "Documents")
+        var isFolder: ObjCBool = false
+        #expect(FileManager.default.fileExists(atPath: folder.path, isDirectory: &isFolder) && isFolder.boolValue)
+        #expect(DocumentPlace.documentsFolder(in: nil) == nil)
+    }
+
+    /// Without iCloud, documents stay on the device.
+    @Test func withoutICloudDocumentsStayOnTheDevice() async {
+        guard FileManager.default.ubiquityIdentityToken == nil else { return }
+        await withCheckedContinuation { done in DocumentPlace.findCloudFolder { done.resume() } }
+        #expect(DocumentPlace.cloudFolder == nil)
+        #expect(DocumentPlace.folder == DocumentPlace.localFolder)
+    }
+
     @Test func remembersTheLastDocumentOrABlankPage() throws {
         let folder = try temporaryFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
