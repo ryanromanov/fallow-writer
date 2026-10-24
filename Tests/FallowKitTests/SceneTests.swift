@@ -60,6 +60,21 @@ struct TestMotion: SceneMotion {
         #expect(!view.isDrifting)
     }
 
+    /// Drift sets out from the scene on screen, rather than jumping to the first, and keeps that
+    /// start when repainted in the other appearance.
+    @Test func driftStartsFromTheSceneShowing() {
+        let scene = SceneLayers()
+        let meadow = BuiltIn.pack.scenes.first { $0.id == "meadow" }!
+        let colors = { (scene.root as! CAGradientLayer).colors as! [CGColor] }
+        scene.paint("meadow", dark: false, animated: false)
+        scene.paint(Library.driftID, dark: false, animated: false)
+        #expect(scene.isDrifting)
+        #expect(colors() == meadow.palette(dark: false).washColors)
+        scene.paint(Library.driftID, dark: true, animated: false)
+        #expect(colors() == meadow.palette(dark: true).washColors)
+        #expect(SceneLayers.rotated(BuiltIn.pack.scenes, toStartAt: "meadow").map(\.id).prefix(2) == ["meadow", "paper"])
+    }
+
     @Test func panelChoosesScenes() {
         let name = "FallowScenes-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!

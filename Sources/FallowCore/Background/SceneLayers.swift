@@ -25,6 +25,8 @@ package final class SceneLayers {
     private let glow = CAGradientLayer()
     /// What's painted now, so layout and redisplay don't restart a crossfade or Drift.
     private var painted: (choice: String, dark: Bool)?
+    /// The scene Drift set out from: the one showing when it was chosen.
+    private var driftStart: String?
 
     /// A scene's motion, inside a holder layer that fades it with the scene. The holder stays while
     /// the motion itself is taken out, when Reduce Motion is on or the scene is hidden.
@@ -64,6 +66,7 @@ package final class SceneLayers {
     /// what's painted already.
     package func paint(_ choice: String, dark: Bool, animated: Bool) {
         if let painted, painted.choice == choice, painted.dark == dark { return }
+        let before = painted?.choice
         painted = (choice, dark)
 
         // Start any change from what's on screen, mid-crossfade or mid-drift included.
@@ -74,7 +77,15 @@ package final class SceneLayers {
             layer.removeAnimation(forKey: "crossfade")
         }
 
-        let scenes = library.scene(for: choice).map { [$0] } ?? library.driftScenes
+        let scenes: [Scenery]
+        if let scene = library.scene(for: choice) {
+            scenes = [scene]
+        } else {
+            // Drift sets out from the scene on screen, so choosing it changes nothing at first.
+            // Repainted in the other appearance, it keeps where it set out from.
+            if let before, before != choice { driftStart = before }
+            scenes = Self.rotated(library.driftScenes, toStartAt: driftStart)
+        }
         let palettes = scenes.map { $0.palette(dark: dark) }
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -183,6 +194,12 @@ package final class SceneLayers {
         animation.fillMode = .backwards
         animation.isRemovedOnCompletion = false
         layer.add(animation, forKey: "drift")
+    }
+
+    /// The scenes in order from the one with `id`, wrapping around; as they are if it's not there.
+    package static func rotated(_ scenes: [Scenery], toStartAt id: String?) -> [Scenery] {
+        guard let index = scenes.firstIndex(where: { $0.id == id }) else { return scenes }
+        return Array(scenes[index...] + scenes[..<index])
     }
 
     /// Drift's key times: each scene is held, then eased into the next, and the last returns to the first.
