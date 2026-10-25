@@ -19,10 +19,22 @@ final class AtmosphereModel: ObservableObject {
     @objc private func changed() { revision += 1 }
 }
 
+/// A link under the panel's choices, for builds that add something of their own there.
+public struct PanelLink {
+    public let title: String
+    public let action: () -> Void
+
+    public init(title: String, action: @escaping () -> Void) {
+        self.title = title
+        self.action = action
+    }
+}
+
 /// The speaker button's popover, as on the Mac: the scene behind the text, which ambient sound
 /// and keystroke sounds play, and how loud. Every change is saved at once.
 struct AtmospherePanel: View {
     @ObservedObject var model: AtmosphereModel
+    var links: [PanelLink] = []
 
     private var settings: WriterSettings { model.settings }
     private var library: Library { model.library }
@@ -62,6 +74,15 @@ struct AtmospherePanel: View {
             Text("Sounds best with headphones, and with keyboard sound off in Settings › Sounds & Haptics")
                 .font(Font(settings.chromeFont(size: 12)).italic())
                 .foregroundStyle(Color(Palette.secondary))
+            if !links.isEmpty {
+                HStack(spacing: 16) {
+                    ForEach(Array(links.enumerated()), id: \.offset) { _, link in
+                        Button(link.title, action: link.action).buttonStyle(.plain)
+                    }
+                }
+                .font(Font(settings.chromeFont(size: 13)))
+                .foregroundStyle(Color(Palette.text))
+            }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 18)

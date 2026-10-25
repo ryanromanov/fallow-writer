@@ -35,10 +35,15 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
     /// Fades the status line and buttons while typing.
     private(set) lazy var fader = ChromeFader { [unowned self] in [statusLabel, soundButton, documentButton] }
 
-    public init(settings: WriterSettings = .shared, library: Library = .shared, sound: SoundEngine = .shared) {
+    /// Links under the choices in the Scene and Sound panel.
+    private let panelLinks: [PanelLink]
+
+    public init(settings: WriterSettings = .shared, library: Library = .shared, sound: SoundEngine = .shared,
+                panelLinks: [PanelLink] = []) {
         self.settings = settings
         self.library = library
         self.sound = sound
+        self.panelLinks = panelLinks
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -618,7 +623,7 @@ public final class WriterViewController: UIViewController, UITextViewDelegate, U
     /// Shows the scene and sound panel as a popover from the speaker button, on iPhone too.
     private func showAtmospherePanel() {
         fader.show()
-        let panel = UIHostingController(rootView: AtmospherePanel(model: AtmosphereModel(settings: settings, library: library)))
+        let panel = UIHostingController(rootView: AtmospherePanel(model: AtmosphereModel(settings: settings, library: library), links: panelLinks))
         panel.modalPresentationStyle = .popover
         panel.preferredContentSize = panel.sizeThatFits(in: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude))
         if let popover = panel.popoverPresentationController {

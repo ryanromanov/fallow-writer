@@ -1,5 +1,5 @@
 #if os(iOS)
-import UIKit
+import SwiftUI
 import Testing
 @testable import FallowTouch
 
@@ -94,6 +94,16 @@ import Testing
         controller.letters.finishAll()
         #expect(controller.letters.runningCount == 0)
         _ = window
+    }
+
+    /// Links given to the screen show under the panel's choices.
+    @Test func panelShowsLinksUnderTheChoices() {
+        let model = AtmosphereModel(settings: freshSettings(), library: .shared)
+        func height(_ links: [PanelLink]) -> CGFloat {
+            UIHostingController(rootView: AtmospherePanel(model: model, links: links))
+                .sizeThatFits(in: CGSize(width: 320, height: CGFloat.greatestFiniteMagnitude)).height
+        }
+        #expect(height([PanelLink(title: "Help", action: {})]) > height([]) + 10)
     }
 }
 #endif
