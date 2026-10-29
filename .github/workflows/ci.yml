@@ -49,3 +49,28 @@ jobs:
           name: Fallow-${{ github.sha }}
           path: Fallow.zip
           retention-days: 14
+
+  ios:
+    name: iPhone and iPad
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+
+      # The newest Xcode on the runner that isn't a beta, which may be newer than the default.
+      - name: Choose Xcode
+        run: |
+          xcode="$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)"
+          echo "DEVELOPER_DIR=$xcode/Contents/Developer" >> "$GITHUB_ENV"
+          DEVELOPER_DIR="$xcode/Contents/Developer" xcodebuild -version
+
+      - name: Test
+        run: scripts/test-ios.sh
+
+      # A device build, unsigned, checks the app itself compiles for iPhone and iPad.
+      - name: Build the app
+        run: |
+          xcodebuild build -project iOS/Fallow.xcodeproj -scheme "Fallow iOS" \
+            -destination 'generic/platform=iOS' -derivedDataPath .build/ios \
+            CODE_SIGNING_ALLOWED=NO | grep -E 'error:|\*\* BUILD'
+          test "${PIPESTATUS[0]}" -eq 0
