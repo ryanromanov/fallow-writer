@@ -295,6 +295,9 @@ final class ChoiceRow: NSView {
 
 /// One word in a ChoiceRow.
 final class ChoiceButton: NSButton {
+    /// The choice's name alone. The title it shows can add a lock, so styling starts from this,
+    /// not from `title`, or each restyle would add another lock.
+    private(set) var name = ""
     var isChosen = false {
         didSet { style() }
     }
@@ -304,6 +307,7 @@ final class ChoiceButton: NSButton {
 
     convenience init(title: String, target: AnyObject, action: Selector) {
         self.init(frame: .zero)
+        name = title
         self.title = title
         self.target = target
         self.action = action
@@ -316,7 +320,7 @@ final class ChoiceButton: NSButton {
     private func style() {
         let font = font ?? NSFont.systemFont(ofSize: 14)
         let color = isChosen ? Palette.text : Palette.secondary
-        let styled = NSMutableAttributedString(string: title, attributes: [.font: font, .foregroundColor: color])
+        let styled = NSMutableAttributedString(string: name, attributes: [.font: font, .foregroundColor: color])
         if isLocked, let lock = NSImage(systemSymbolName: "lock.fill", accessibilityDescription: nil)?
             .withSymbolConfiguration(.init(pointSize: font.pointSize * 0.6, weight: .regular)) {
             let attachment = NSTextAttachment()
@@ -326,6 +330,7 @@ final class ChoiceButton: NSButton {
             styled.addAttribute(.foregroundColor, value: color, range: NSRange(location: 0, length: styled.length))
         }
         attributedTitle = styled
+        setAccessibilityLabel(name)
         setAccessibilityValue(isChosen ? 1 : 0)
         setAccessibilityHelp(isLocked ? "Locked. Choose to unlock." : nil)
     }

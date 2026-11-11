@@ -14,11 +14,11 @@ import Testing
     }
 
     func click(_ row: ChoiceRow, _ title: String) {
-        row.buttons.first { $0.title == title }!.performClick(nil)
+        row.buttons.first { $0.name == title }!.performClick(nil)
     }
 
     func chosen(_ row: ChoiceRow) -> [String] {
-        row.buttons.filter(\.isChosen).map(\.title)
+        row.buttons.filter(\.isChosen).map(\.name)
     }
 
     /// A row too long for the panel wraps between words: no line runs past the panel's width,
@@ -44,6 +44,26 @@ import Testing
                 #expect(dot.isHidden && after.minX == 0)
             }
         }
+        _ = panel
+    }
+
+    /// Restyling, which every volume change and settings change does, keeps one lock on a locked
+    /// choice and its width steady, rather than adding a lock each time and widening the panel.
+    @Test func restylingKeepsLockedChoicesTheSameWidth() {
+        let (panel, settings) = makePanel()
+        let row = ChoiceRow(settings: settings, label: "Test")
+        row.options = [ChoiceRow.Option(title: "Paper", id: "paper"), ChoiceRow.Option(title: "Sample", id: "sample", isLocked: true)]
+        row.selected = "paper"
+        let locked = row.buttons[1]
+        let width = locked.intrinsicContentSize.width, rowWidth = row.intrinsicContentSize.width
+        for volume in stride(from: Float(0.1), through: 1, by: 0.1) {
+            settings.keystrokeVolume = volume
+            row.selected = "paper"
+        }
+        #expect(locked.intrinsicContentSize.width == width)
+        #expect(row.intrinsicContentSize.width == rowWidth)
+        #expect(locked.attributedTitle.string.filter { $0 == "\u{FFFC}" }.count == 1)
+        #expect(locked.name == "Sample" && locked.accessibilityLabel() == "Sample")
         _ = panel
     }
 
