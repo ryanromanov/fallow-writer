@@ -189,6 +189,15 @@ func referenceLowField(sampleRate: Double, frames: Int) -> (left: [Float], right
         return samples
     }
 
+    /// The loudest point in the audio after a keystroke. A player takes a newly scheduled buffer
+    /// in on its own time, not at once, and offline rendering runs far faster than real time,
+    /// so on a busy machine the first tenths of a second can render before the keystroke has
+    /// arrived (seen on CI as exact silence, with the sound arriving in the next render). Two
+    /// seconds leaves room for that and for the whole sound; one that never plays still fails.
+    func keystrokePeak(_ engine: AVAudioEngine) throws -> Float {
+        peak(try render(engine, seconds: 2))
+    }
+
     @Test func keystrokeReachesTheOutput() throws {
         let sound = SoundEngine(settings: makeSettings(keys: true, ambient: false), offline: true)
         sound.windowOpened()
@@ -196,8 +205,7 @@ func referenceLowField(sampleRate: Double, frames: Int) -> (left: [Float], right
         let before = try render(sound.engine, seconds: 0.2)
         #expect(rms(before) < 1e-4)
         sound.keystroke(.letter)
-        let after = try render(sound.engine, seconds: 0.3)
-        #expect(rms(after) > 0.005)
+        #expect(try keystrokePeak(sound.engine) > 0.01)
     }
 
     @Test func ambientPlaysOnlyWhenOn() throws {
@@ -227,8 +235,7 @@ func referenceLowField(sampleRate: Double, frames: Int) -> (left: [Float], right
         settings.keystrokeSounds = true
         #expect(sound.engine.isRunning)
         sound.keystroke(.letter)
-        let after = try render(sound.engine, seconds: 0.3)
-        #expect(rms(after) > 0.005)
+        #expect(try keystrokePeak(sound.engine) > 0.01)
     }
 
     @Test func keystrokeVolumeScalesKeys() throws {
@@ -238,7 +245,7 @@ func referenceLowField(sampleRate: Double, frames: Int) -> (left: [Float], right
             let sound = SoundEngine(settings: settings, offline: true)
             sound.windowOpened()
             sound.keystroke(.space)
-            return peak(try render(sound.engine, seconds: 0.3))
+            return try keystrokePeak(sound.engine)
         }
         let full = try level(volume: 1), quiet = try level(volume: 0.4)
         // Each keystroke also varies randomly between 85% and 100%, so allow for that either way.
